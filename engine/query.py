@@ -16,7 +16,7 @@ import sys, os, json, re, collections
 sys.path.insert(0, os.path.dirname(__file__))
 from corpus import Corpus
 
-DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "db", "corpus.db"))
+DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "corpus.db"))
 STOP = set("the a an and or but if then of to in on for with at by from is are was were be been "
            "i you he she it we they me my your his her our their this that these those as so not no "
            "do does did have has had will would can could should just get got im ive dont thats "
@@ -40,12 +40,12 @@ def stats(c):
 
 def top_contacts(c, n=20):
     return [dict(r) for r in c.db.execute(
-        "SELECT display_name,total_items,sent,received,source_list,first_ts,last_ts "
+        "SELECT display_name,relationship,total_items,sent,received,source_list,first_ts,last_ts "
         "FROM v_top_contacts LIMIT ?", (n,))]
 
 
 def top_sources(c):
-    return [dict(r) for r in c.db.execute("SELECT * FROM v_top_sources")]
+    return [dict(r) for r in c.db.execute("SELECT * FROM v_sources")]
 
 
 def monthly(c):
@@ -56,7 +56,7 @@ def voice_sample(c, n=500):
     """Your own words only: sent communications + published content."""
     return [dict(r) for r in c.db.execute(
         "SELECT source,ts,title,body FROM items "
-        "WHERE (direction IN ('sent','posted','reviewed') ) AND body IS NOT NULL AND length(body)>3 "
+        "WHERE direction IN ('out','sent','posted') AND body IS NOT NULL AND length(body)>3 "
         "ORDER BY ts DESC LIMIT ?", (n,))]
 
 
