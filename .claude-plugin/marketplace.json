@@ -1,0 +1,15 @@
+{
+  "name": "personal-corpus-marketplace",
+  "owner": { "name": "personal-corpus contributors" },
+  "metadata": {
+    "description": "A local-first toolkit to turn your personal-data exports into a queryable corpus, profile, and analysis.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "personal-corpus",
+      "source": "./",
+      "description": "Acquire, ingest, profile, and analyze your personal data locally. Works with any subset of sources."
+    }
+  ]
+}
