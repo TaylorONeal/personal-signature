@@ -20,7 +20,7 @@ from corpus import Corpus
 from parsers import exports as ex
 from parsers import extra as ex2
 
-DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "db", "corpus.db"))
+DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "corpus.db"))
 
 
 def jsonl_items(path):

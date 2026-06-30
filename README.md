@@ -1,14 +1,45 @@
 # personal-corpus
 
-**Turn your scattered personal-data exports into one local, queryable picture of yourself — then let an AI build two things from it: a Content Profile and a Communication Signature.**
+**You are already being modeled. This builds that model *for you* — on your own machine, from your own data, pointed at your own goals.**
 
-Everything runs locally. Your data never leaves your machine. You don't need every source — the whole system is built to work with whatever subset you have and to tell you, honestly, what's thin.
+<p align="center"><img src="docs/signal.svg" alt="Reclaim the model: your behavior is the highest-signal data about you that exists. Right now it trains someone else's model of you — to sell to you. personal-corpus builds it for you instead: a Content Profile, a Communication Signature, and a queryable substrate for your own AI apps." width="860"></p>
+
+Everything runs locally. Your data never leaves your machine. You don't need every source — the whole system is built to work with whatever subset you have, and to tell you, honestly, what's thin.
 
 ---
 
-## The two goals (read this first)
+## Why this exists
 
-This project exists to produce **two different portraits of a person**, from two different halves of their data. Keeping them distinct is the core design idea.
+Every platform you touch already keeps a model of you. Spotify models your taste, Google models your interests, Meta models your relationships, every ad network on the internet stitches fragments of your behavior into a profile. Those models are good. They're just not *yours* — their objective function is someone else's revenue. They predict what you'll click, what you'll buy, what keeps you scrolling. The model of you exists; it's simply aimed away from you.
+
+**personal-corpus flips the ownership, not the technique.** The raw material those companies use — what you listen to, watch, save, write, and where you go — is sitting in the data exports you're legally entitled to download. This pulls it onto your own machine, into one clean local database, and builds the model on *your* side of the line, optimized for *your* objective:
+
+- **Recommendations that serve you** — surfaced because they fit your taste, not because they maximize someone's engagement metric.
+- **Insight you can't get from inside your own head** — how your relationships actually trend, how your interests have shifted over a decade, what you keep coming back to.
+- **An AI that sounds like *you*** — a drop-in "voice block" built from your real sent messages, so any LLM can write and answer in your actual register instead of generic-assistant beige.
+- **A substrate for whatever you build next** — `corpus.db` is a plain, queryable SQLite database. It's the personal-context layer that generic AI is missing. Point your own apps, agents, and scripts at it.
+
+> Other companies do this to sell *to* you. There's no reason the same data can't produce far better recommendations, real self-knowledge, and a genuine digital voice — for you.
+
+---
+
+## Why your own data is the highest-signal data there is
+
+Not all data about a person is equal. The exports this system uses are the densest, most honest signal that exists about you — denser than any survey, profile, or thing you'd write in a bio:
+
+- **It's behavioral, not declared.** A questionnaire records what you *say* you like; your library, your watch history, and your sent folder record what you actually *did*. Revealed preference beats stated preference every time.
+- **It's longitudinal.** Not a snapshot — years of it. That's what lets the system see eras, drift, and how you changed, instead of just where you are today.
+- **It's in your own words.** Your sent messages and posts are the only large body of text that is unambiguously *your voice* — in real contexts, to real people, with real stakes. That's what makes a credible Communication Signature possible at all.
+- **It's first-party and complete.** Ad networks reconstruct you from fragments seen through tracking. You have the whole thing, from the inside, with ground truth on who each contact is and which words are yours.
+- **It's unperformed.** The 2 a.m. text, the playlist you'd never share, the search you'd never post — the realest signal is exactly the stuff that never makes it into a public persona.
+
+Put differently: the most valuable training set about you in the world is one you can already download. This is the toolkit for using it yourself.
+
+---
+
+## What you get — two portraits and a substrate
+
+The system produces **two different portraits of a person**, from two different halves of their data, plus the raw substrate underneath both. Keeping the two portraits distinct is the core design idea.
 
 ### 1. Content Profile — *what you consume and are into*
 Built from the things you take **in**: music you save, videos you watch, articles you bookmark, books you read, restaurants you review, places you travel. It answers: *what are this person's tastes, interests, and obsessions? What do their inputs say about them?*
@@ -22,7 +53,10 @@ Built from the things you put **out** to people: your messages, emails, posts, r
 - Sources: iMessage, Gmail, Instagram/Facebook DMs, Google Chat, Google Voice, WhatsApp, Slack, X, Yelp reviews, blogs.
 - Output: a drop-in **voice block** (write-as-me), a register map (texting vs email vs public), and **relationship dynamics** (who initiates, sent:received balance, how bonds start and end).
 
-> One person, two lenses. The Content Profile is your *inputs*; the Communication Signature is your *outputs*. They cross-check each other — and the interesting findings are usually where they agree or contradict.
+### 3. The corpus itself — *the personal-context layer for your own AI*
+Underneath both portraits is `corpus.db` and `engine/query.py`: one normalized table of everything, with full-text search and ready-made read helpers. This is the part you build *on*. Want a recommender, a "what was I into in 2019" agent, a daily-journal summarizer, a write-as-me email drafter? They all read from the same local store.
+
+> One person, two lenses, one substrate. The Content Profile is your *inputs*; the Communication Signature is your *outputs*. They cross-check each other — and the interesting findings are usually where they agree or contradict.
 
 ---
 
@@ -30,14 +64,7 @@ Built from the things you put **out** to people: your messages, emails, posts, r
 
 A four-stage pipeline on a shared local SQLite database. Stages talk **only** through the DB, so each one runs on whatever the previous stage produced. Stop at any stage; a missing source never breaks the next one.
 
-```
-  ACQUIRE  ─▶  COLLECT  ─▶  INGEST  ─▶  ┌─ PROFILE  ─▶  Content Profile
- (request)    (download)   (parse+store) │              Communication Signature
-                              │          └─ ANALYZE  ─▶  deep, on-demand dives
-                              ▼
-                          corpus.db
-                    items · contacts · sources
-```
+<p align="center"><img src="docs/architecture.svg" alt="The personal-corpus pipeline: Acquire requests exports, Collect watches your inbox and downloads them, Ingest parses and stores into corpus.db, which feeds a Content Profile, a Communication Signature, and your own apps. Every item lands in one of three buckets: signal_in, communication, or published." width="760"></p>
 
 | Stage | Skill | What it does |
 |---|---|---|
@@ -47,7 +74,7 @@ A four-stage pipeline on a shared local SQLite database. Stages talk **only** th
 | 3. Profile | `corpus-profile` | Produces the **Content Profile** and the **Communication Signature** (fast, repeatable, coverage-aware). |
 | 4. Analyze | `corpus-analyze` | On-demand deep dives — comm patterns, relationship dynamics, interest evolution, timeline. Cited, honest about gaps. |
 
-Under all of them is the **engine** (`engine/`): one schema, the `Corpus` ingest library, a parser registry, and `coverage.py`.
+Under all of them is the **engine** (`engine/`): one schema, the `Corpus` ingest library, a parser registry, `query.py` read helpers, and `coverage.py`.
 
 ---
 
@@ -92,6 +119,17 @@ python engine/run_ingest.py csv          exports/liked.csv --source spotify_like
     --bucket signal_in --direction liked --map "title=Track Name,ts=Added At"
 ```
 
+Then explore the substrate directly:
+```bash
+python engine/query.py stats            # counts by bucket/source, date range
+python engine/query.py top-contacts     # who you talk to most, sent:received
+python engine/query.py voice-sample     # your own words, for a voice block
+python engine/query.py interests        # what you point attention at
+python engine/query.py search "<text>"  # full-text search across everything
+```
+
+The database lands at `corpus.db` in the repo root (git-ignored, never committed).
+
 ---
 
 ## Supported sources
@@ -120,6 +158,8 @@ Adding one is a single generator that yields the Item dict (see `docs/ARCHITECTU
 
 ## Privacy & safety
 
+This only works because it's local. The whole premise — owning the model instead of renting it from a platform — falls apart the moment the data leaves your machine.
+
 - **Local only.** The DB never leaves your machine. No cloud, no telemetry.
 - The AI is instructed to **never enter your passwords or 2FA** (it hands those steps to you), **never write sensitive personal/relationship/health detail into persistent memory**, and to keep deep analyses in a clearly-marked local folder.
 - **Back up before bulk runs.** The engine fails loud on a bad copy and refuses to overwrite the store with a DB <90% its size (shrink-guard); a timestamped backup is still the real safety net.
@@ -129,9 +169,9 @@ Adding one is a single generator that yields the Item dict (see `docs/ARCHITECTU
 
 ## Repo layout
 ```
-engine/        schema.sql · corpus.py · parsers/ · run_ingest.py · coverage.py
+engine/        schema.sql · corpus.py · parsers/ · run_ingest.py · query.py · coverage.py
 skills/        corpus-acquire · corpus-collect · corpus-ingest · corpus-profile · corpus-analyze
-docs/          ARCHITECTURE.md · architecture.svg
+docs/          ARCHITECTURE.md · architecture.svg · signal.svg
 identity.example.json
 .claude-plugin/ plugin.json · marketplace.json   (installable as a Claude plugin)
 ```

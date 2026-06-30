@@ -1,0 +1,66 @@
+<svg viewBox="0 0 860 470" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif,system-ui,sans-serif">
+  <title>Reclaim the model</title>
+  <desc>Your behavioral data — the messages you write, the music and shows you save, the links and places you keep, the things you publish — is the highest-signal data about you that exists. Ad-tech already uses the same raw material to build a model of you optimized to sell to you. personal-corpus builds the model on your own machine, optimized for you: a Content Profile, a Communication Signature, and a queryable substrate for your own AI apps.</desc>
+  <style>
+    .t{fill:var(--text-100,#11181c)} .m{fill:var(--text-300,#5b6b75)}
+    .h{font-weight:700} .lbl{font-size:14px;font-weight:700} .sub{font-size:11.5px} .tiny{font-size:10.5px}
+    .chip{fill:var(--bg-100,#fff);stroke:var(--border-200,#cfd4d8)}
+    .arr{stroke:var(--text-300,#8a98a1);stroke-width:1.7;fill:none;marker-end:url(#a)}
+    .ghost{fill:#f1efee;stroke:#d7cfca} .ghostt{fill:#8a7d74}
+    .redarr{stroke:#bb5b4d;stroke-width:1.7;fill:none;marker-end:url(#r)}
+    .cA{fill:#e9f3ef;stroke:#2f8268} .cAt{fill:#1f5e4b}
+    .cB{fill:#eceafb;stroke:#6d4bd1} .cBt{fill:#4a31a0}
+    .cC{fill:#e3f0f3;stroke:#2b7a90} .cCt{fill:#1d5667}
+    .corpus{fill:#eef7f3;stroke:#2f8268}
+    .div{stroke:var(--border-200,#d7dbde);stroke-dasharray:3 5}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8a98a1"/></marker>
+    <marker id="r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#bb5b4d"/></marker>
+  </defs>
+
+  <text x="30" y="40" class="t h" font-size="23">Reclaim the model.</text>
+  <text x="30" y="61" class="m" font-size="12.5">Your behavior is the highest-signal data about you that exists.</text>
+  <text x="30" y="79" class="m" font-size="12.5">Right now it trains someone else's model of you — to sell to you. Build your own.</text>
+
+  <!-- inputs band -->
+  <text x="30" y="104" class="m tiny h">HIGH-SIGNAL SOURCES · your real behavior, in your own words, over years</text>
+  <rect class="chip" x="30"  y="114" width="180" height="32" rx="16"/><text x="120" y="135" text-anchor="middle" class="t sub">messages you write</text>
+  <rect class="chip" x="222" y="114" width="180" height="32" rx="16"/><text x="312" y="135" text-anchor="middle" class="t sub">music &amp; shows you save</text>
+  <rect class="chip" x="414" y="114" width="170" height="32" rx="16"/><text x="499" y="135" text-anchor="middle" class="t sub">links &amp; places you keep</text>
+  <rect class="chip" x="596" y="114" width="174" height="32" rx="16"/><text x="683" y="135" text-anchor="middle" class="t sub">things you publish</text>
+
+  <!-- fork -->
+  <text x="400" y="166" text-anchor="middle" class="m tiny" font-style="italic">the exact same raw signal forks two ways</text>
+  <path class="redarr" d="M340,150 C300,162 250,168 222,184"/>
+  <path class="arr"    d="M470,150 C540,162 600,168 640,184"/>
+
+  <!-- vertical divider between the two worldviews -->
+  <line class="div" x1="426" y1="150" x2="426" y2="372"/>
+
+  <!-- LEFT: their model -->
+  <rect class="ghost" x="48" y="186" width="332" height="64" rx="11"/>
+  <text x="214" y="212" text-anchor="middle" class="ghostt lbl">Their model of you</text>
+  <text x="214" y="232" text-anchor="middle" class="ghostt sub">built to predict what you'll buy</text>
+  <path class="redarr" d="M214,250 V286"/>
+  <rect class="ghost" x="92" y="288" width="244" height="32" rx="16"/>
+  <text x="214" y="309" text-anchor="middle" class="ghostt sub" font-weight="600">ads · nudges · the feed</text>
+  <text x="214" y="350" text-anchor="middle" class="m tiny">fragmented · third-party · optimizes <tspan font-weight="700">their</tspan> objective</text>
+
+  <!-- RIGHT: your model -->
+  <rect class="corpus" x="472" y="186" width="332" height="64" rx="11" stroke-width="1.5"/>
+  <text x="638" y="210" text-anchor="middle" class="cAt lbl">corpus.db — on your machine</text>
+  <text x="638" y="230" text-anchor="middle" class="cAt sub">local · first-party · the complete picture</text>
+  <path class="arr" d="M560,250 C548,266 540,272 532,286"/>
+  <path class="arr" d="M638,250 V286"/>
+  <path class="arr" d="M716,250 C728,266 736,272 744,286"/>
+  <rect class="cA" x="466" y="288" width="120" height="32" rx="9"/><text x="526" y="309" text-anchor="middle" class="cAt sub" font-weight="700">Content Profile</text>
+  <rect class="cB" x="592" y="288" width="132" height="32" rx="9"/><text x="658" y="309" text-anchor="middle" class="cBt sub" font-weight="700">Comm. Signature</text>
+  <rect class="cC" x="730" y="288" width="74"  height="32" rx="9"/><text x="767" y="305" text-anchor="middle" class="cCt tiny" font-weight="700">your own</text><text x="767" y="316" text-anchor="middle" class="cCt tiny" font-weight="700">AI apps</text>
+  <text x="638" y="350" text-anchor="middle" class="m tiny">complete · first-party · optimizes <tspan font-weight="700">yours</tspan></text>
+
+  <!-- kicker -->
+  <line x1="30" y1="384" x2="830" y2="384" stroke="var(--border-200,#e3e6e8)"/>
+  <text x="30" y="412" class="t" font-size="12.5"><tspan font-weight="700">Same data, opposite owner.</tspan> The corpus is a substrate, not a dead end —</text>
+  <text x="30" y="432" class="m" font-size="12.5">query.py, the skills, and whatever you build read from it — recommendations, insight, and writing in your real voice.</text>
+</svg>

@@ -13,7 +13,7 @@ Re-running an ingest is therefore idempotent.
 """
 import sqlite3, hashlib, json, os, datetime, re, shutil, tempfile
 
-SCHEMA = os.path.join(os.path.dirname(__file__), "..", "db", "schema.sql")
+SCHEMA = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 
 def _work_dir():

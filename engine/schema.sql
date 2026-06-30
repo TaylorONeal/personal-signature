@@ -93,8 +93,9 @@ CREATE VIEW v_sources AS
 DROP VIEW IF EXISTS v_top_contacts;
 CREATE VIEW v_top_contacts AS
   SELECT c.display_name, c.relationship, COUNT(*) total_items,
-         SUM(CASE WHEN i.direction IN ('out','sent') THEN 1 ELSE 0 END) sent_to_them,
-         SUM(CASE WHEN i.direction='in' THEN 1 ELSE 0 END) recd_from_them,
+         SUM(CASE WHEN i.direction IN ('out','sent') THEN 1 ELSE 0 END) sent,
+         SUM(CASE WHEN i.direction IN ('in','received') THEN 1 ELSE 0 END) received,
+         GROUP_CONCAT(DISTINCT i.source) source_list,
          MIN(i.ts) first_ts, MAX(i.ts) last_ts
   FROM items i JOIN contacts c ON i.contact_id=c.id
   WHERE i.bucket='communication' GROUP BY i.contact_id ORDER BY total_items DESC;
