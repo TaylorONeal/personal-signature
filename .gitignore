@@ -1,0 +1,16 @@
+# your data and identity never get committed
+identity.json
+corpus.db
+corpus.db-*
+*.bak-*
+exports/
+_ingested.json
+
+# python
+__pycache__/
+*.pyc
+.venv/
+/var/tmp/
+
+# os
+.DS_Store

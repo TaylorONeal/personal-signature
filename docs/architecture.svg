@@ -1,0 +1,90 @@
+<svg viewBox="0 0 760 580" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif,system-ui,sans-serif">
+  <title>personal-corpus architecture</title>
+  <desc>A four-stage local pipeline (acquire, collect, ingest, then profile/analyze) that loads personal-data exports into one SQLite database, whose three buckets feed two outputs: a Content Profile and a Communication Signature.</desc>
+  <style>
+    .t{fill:var(--text-100,#11181c)} .m{fill:var(--text-300,#5b6b75)}
+    .box{fill:var(--bg-200,#f5f6f7);stroke:var(--border-200,#d7dbde)}
+    .lbl{font-size:14px;font-weight:600} .sub{font-size:11px} .tiny{font-size:10.5px}
+    .arr{stroke:var(--text-300,#8a98a1);stroke-width:1.6;fill:none;marker-end:url(#a)}
+    .cA{fill:#e9f3ef;stroke:#2f8268} .cAt{fill:#1f5e4b}
+    .cB{fill:#eceafb;stroke:#6d4bd1} .cBt{fill:#4a31a0}
+    .chip{fill:var(--bg-100,#fff);stroke:var(--border-200,#cfd4d8)}
+  </style>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L7,3 L0,6 Z" fill="#8a98a1"/></marker></defs>
+
+  <text x="30" y="34" class="t" font-size="20" font-weight="700">personal-corpus</text>
+  <text x="30" y="54" class="m" font-size="12">Your data exports → one local DB → two portraits of you. Local-only. Any subset of sources works.</text>
+
+  <!-- pipeline tier -->
+  <g>
+    <rect class="box" x="30" y="78" width="118" height="50" rx="9"/>
+    <text x="89" y="100" text-anchor="middle" class="t lbl">Acquire</text>
+    <text x="89" y="117" text-anchor="middle" class="m sub">request exports</text>
+    <rect class="box" x="172" y="78" width="118" height="50" rx="9"/>
+    <text x="231" y="100" text-anchor="middle" class="t lbl">Collect</text>
+    <text x="231" y="117" text-anchor="middle" class="m sub">watch inbox, download</text>
+    <rect class="box" x="314" y="78" width="118" height="50" rx="9"/>
+    <text x="373" y="100" text-anchor="middle" class="t lbl">Ingest</text>
+    <text x="373" y="117" text-anchor="middle" class="m sub">parse + store</text>
+    <line class="arr" x1="148" y1="103" x2="170" y2="103"/>
+    <line class="arr" x1="290" y1="103" x2="312" y2="103"/>
+    <line class="arr" x1="432" y1="103" x2="470" y2="103"/>
+    <!-- db cylinder -->
+    <g>
+      <path d="M474,92 a52,11 0 0,1 104,0 v24 a52,11 0 0,1 -104,0 Z" class="box"/>
+      <ellipse cx="526" cy="92" rx="52" ry="11" class="box"/>
+      <text x="526" y="90" text-anchor="middle" class="t lbl">corpus.db</text>
+      <text x="526" y="110" text-anchor="middle" class="m tiny">items · contacts</text>
+    </g>
+  </g>
+
+  <!-- buckets tier -->
+  <text x="30" y="168" class="m" font-size="11" font-weight="600">EVERY ITEM LANDS IN ONE BUCKET</text>
+  <rect class="chip" x="30" y="180" width="150" height="34" rx="17"/>
+  <text x="105" y="201" text-anchor="middle" class="t sub" font-weight="600">signal_in</text>
+  <rect class="chip" x="196" y="180" width="180" height="34" rx="17"/>
+  <text x="286" y="201" text-anchor="middle" class="t sub" font-weight="600">communication</text>
+  <rect class="chip" x="392" y="180" width="150" height="34" rx="17"/>
+  <text x="467" y="201" text-anchor="middle" class="t sub" font-weight="600">published</text>
+  <line class="arr" x1="526" y1="125" x2="300" y2="178"/>
+
+  <!-- two goal panels -->
+  <!-- Content Profile -->
+  <rect class="cA" x="30" y="250" width="340" height="300" rx="12" stroke-width="1.5"/>
+  <text x="50" y="284" class="cAt" font-size="16" font-weight="700">Content Profile</text>
+  <text x="50" y="304" class="cAt" font-size="12">what you consume &amp; are into</text>
+  <text x="50" y="338" class="m tiny" font-weight="600">FROM: signal_in (+ published topics)</text>
+  <g class="t" font-size="12.5">
+    <text x="50" y="368">• taste clusters + mood/era signature</text>
+    <text x="50" y="392">• interest map (themes you collect)</text>
+    <text x="50" y="416">• places, food, travel footprint</text>
+    <text x="50" y="440">• how interests evolved over time</text>
+  </g>
+  <text x="50" y="478" class="m tiny" font-weight="600">SOURCES</text>
+  <text x="50" y="498" class="m tiny">Spotify · YouTube · Netflix · bookmarks ·</text>
+  <text x="50" y="513" class="m tiny">Yelp · orders · travel</text>
+
+  <!-- Communication Signature -->
+  <rect class="cB" x="392" y="250" width="338" height="300" rx="12" stroke-width="1.5"/>
+  <text x="412" y="284" class="cBt" font-size="16" font-weight="700">Communication Signature</text>
+  <text x="412" y="304" class="cBt" font-size="12">how you write &amp; relate</text>
+  <text x="412" y="338" class="m tiny" font-weight="600">FROM: communication + published</text>
+  <g class="t" font-size="12.5">
+    <text x="412" y="368">• voice block (write-as-you)</text>
+    <text x="412" y="392">• register map: texting / email / public</text>
+    <text x="412" y="416">• relationship dynamics (who initiates,</text>
+    <text x="412" y="432" font-size="12.5">   sent:received, how bonds start/end)</text>
+    <text x="412" y="456">• tics &amp; tells, do / don't</text>
+  </g>
+  <text x="412" y="492" class="m tiny" font-weight="600">SOURCES</text>
+  <text x="412" y="512" class="m tiny">iMessage · Gmail · IG/FB DMs · Google Chat ·</text>
+  <text x="412" y="527" class="m tiny">Voice · WhatsApp · Slack · X · reviews</text>
+
+  <!-- bucket -> goal arrows -->
+  <line class="arr" x1="105" y1="214" x2="140" y2="248"/>
+  <line class="arr" x1="286" y1="214" x2="500" y2="248"/>
+  <path class="arr" d="M430,214 C420,232 360,236 320,248"/>
+  <path class="arr" d="M500,214 C470,230 450,236 470,248"/>
+  <text x="372" y="240" text-anchor="middle" class="m tiny">published feeds both</text>
+</svg>
