@@ -14,7 +14,7 @@
     <path d="M0,0 L7,3 L0,6 Z" fill="#8a98a1"/></marker></defs>
 
   <text x="30" y="34" class="t" font-size="20" font-weight="700">personal-corpus</text>
-  <text x="30" y="54" class="m" font-size="12">Your data exports → one local DB → two portraits of you. Local-only. Any subset of sources works.</text>
+  <text x="30" y="54" class="m" font-size="12">Your data exports → one local DB → two portraits + a substrate for your own apps. Any subset of sources works.</text>
 
   <!-- pipeline tier -->
   <g>
@@ -37,6 +37,11 @@
       <text x="526" y="90" text-anchor="middle" class="t lbl">corpus.db</text>
       <text x="526" y="110" text-anchor="middle" class="m tiny">items · contacts</text>
     </g>
+    <!-- the DB is also a queryable substrate for anything you build -->
+    <line class="arr" x1="578" y1="103" x2="600" y2="103"/>
+    <rect class="chip" x="602" y="86" width="138" height="34" rx="9"/>
+    <text x="671" y="101" text-anchor="middle" class="t sub" font-weight="600">your own apps</text>
+    <text x="671" y="114" text-anchor="middle" class="m tiny">query.py · skills · yours</text>
   </g>
 
   <!-- buckets tier -->
