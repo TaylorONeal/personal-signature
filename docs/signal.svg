@@ -2,21 +2,46 @@
   <title>Reclaim the model</title>
   <desc>Your behavioral data — the messages you write, the music and shows you save, the links and places you keep, the things you publish — is the highest-signal data about you that exists. Ad-tech already uses the same raw material to build a model of you optimized to sell to you. personal-corpus builds the model on your own machine, optimized for you: a Content Profile, a Communication Signature, and a queryable substrate for your own AI apps.</desc>
   <style>
-    .t{fill:var(--text-100,#11181c)} .m{fill:var(--text-300,#5b6b75)}
+    :root{
+      --t:#11181c; --m:#5b6b75; --arr:#8a98a1; --red:#bb5b4d;
+      --chip-f:#ffffff; --chip-s:#cfd4d8;
+      --ghost-f:#f1efee; --ghost-s:#d7cfca; --ghost-t:#8a7d74;
+      --ca-f:#e9f3ef; --ca-s:#2f8268; --ca-t:#1f5e4b;
+      --cb-f:#eceafb; --cb-s:#6d4bd1; --cb-t:#4a31a0;
+      --cc-f:#e3f0f3; --cc-s:#2b7a90; --cc-t:#1d5667;
+      --corpus-f:#eef7f3; --corpus-s:#2f8268;
+      --div:#d7dbde; --rule:#e3e6e8;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --t:#e6edf3; --m:#98a6b0; --arr:#768692; --red:#e0755f;
+        --chip-f:#161b22; --chip-s:#3d444d;
+        --ghost-f:#26221f; --ghost-s:#4a423c; --ghost-t:#b3a496;
+        --ca-f:#11291f; --ca-s:#3fa47f; --ca-t:#8fd6b7;
+        --cb-f:#1e1836; --cb-s:#8b6ce8; --cb-t:#c3b1f7;
+        --cc-f:#0f2830; --cc-s:#4aa9c4; --cc-t:#9fd6e6;
+        --corpus-f:#12271e; --corpus-s:#3fa47f;
+        --div:#3d444d; --rule:#30363d;
+      }
+    }
+    .t{fill:var(--t)} .m{fill:var(--m)}
     .h{font-weight:700} .lbl{font-size:14px;font-weight:700} .sub{font-size:11.5px} .tiny{font-size:10.5px}
-    .chip{fill:var(--bg-100,#fff);stroke:var(--border-200,#cfd4d8)}
-    .arr{stroke:var(--text-300,#8a98a1);stroke-width:1.7;fill:none;marker-end:url(#a)}
-    .ghost{fill:#f1efee;stroke:#d7cfca} .ghostt{fill:#8a7d74}
-    .redarr{stroke:#bb5b4d;stroke-width:1.7;fill:none;marker-end:url(#r)}
-    .cA{fill:#e9f3ef;stroke:#2f8268} .cAt{fill:#1f5e4b}
-    .cB{fill:#eceafb;stroke:#6d4bd1} .cBt{fill:#4a31a0}
-    .cC{fill:#e3f0f3;stroke:#2b7a90} .cCt{fill:#1d5667}
-    .corpus{fill:#eef7f3;stroke:#2f8268}
-    .div{stroke:var(--border-200,#d7dbde);stroke-dasharray:3 5}
+    .chip{fill:var(--chip-f);stroke:var(--chip-s)}
+    .arr{stroke:var(--arr);stroke-width:1.7;fill:none;marker-end:url(#a)}
+    .arrhead{fill:var(--arr)}
+    .ghost{fill:var(--ghost-f);stroke:var(--ghost-s)} .ghostt{fill:var(--ghost-t)}
+    .redarr{stroke:var(--red);stroke-width:1.7;fill:none;marker-end:url(#r)}
+    .redhead{fill:var(--red)}
+    .cA{fill:var(--ca-f);stroke:var(--ca-s)} .cAt{fill:var(--ca-t)}
+    .cB{fill:var(--cb-f);stroke:var(--cb-s)} .cBt{fill:var(--cb-t)}
+    .cC{fill:var(--cc-f);stroke:var(--cc-s)} .cCt{fill:var(--cc-t)}
+    .corpus{fill:var(--corpus-f);stroke:var(--corpus-s)}
+    .div{stroke:var(--div);stroke-dasharray:3 5}
+    .rule{stroke:var(--rule)}
   </style>
   <defs>
-    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8a98a1"/></marker>
-    <marker id="r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#bb5b4d"/></marker>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="arrhead"/></marker>
+    <marker id="r" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" class="redhead"/></marker>
   </defs>
 
   <text x="30" y="40" class="t h" font-size="23">Reclaim the model.</text>
@@ -60,7 +85,7 @@
   <text x="638" y="350" text-anchor="middle" class="m tiny">complete · first-party · optimizes <tspan font-weight="700">yours</tspan></text>
 
   <!-- kicker -->
-  <line x1="30" y1="384" x2="830" y2="384" stroke="var(--border-200,#e3e6e8)"/>
+  <line class="rule" x1="30" y1="384" x2="830" y2="384"/>
   <text x="30" y="412" class="t" font-size="12.5"><tspan font-weight="700">Same data, opposite owner.</tspan> The corpus is a substrate, not a dead end —</text>
   <text x="30" y="432" class="m" font-size="12.5">query.py, the skills, and whatever you build read from it — recommendations, insight, and writing in your real voice.</text>
 </svg>
