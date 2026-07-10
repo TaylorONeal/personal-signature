@@ -2,16 +2,33 @@
   <title>personal-corpus architecture</title>
   <desc>A four-stage local pipeline (acquire, collect, ingest, then profile/analyze) that loads personal-data exports into one SQLite database, whose three buckets feed two outputs: a Content Profile and a Communication Signature.</desc>
   <style>
-    .t{fill:var(--text-100,#11181c)} .m{fill:var(--text-300,#5b6b75)}
-    .box{fill:var(--bg-200,#f5f6f7);stroke:var(--border-200,#d7dbde)}
+    :root{
+      --t:#11181c; --m:#5b6b75; --arr:#8a98a1;
+      --box-f:#f5f6f7; --box-s:#d7dbde;
+      --chip-f:#ffffff; --chip-s:#cfd4d8;
+      --ca-f:#e9f3ef; --ca-s:#2f8268; --ca-t:#1f5e4b;
+      --cb-f:#eceafb; --cb-s:#6d4bd1; --cb-t:#4a31a0;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --t:#e6edf3; --m:#98a6b0; --arr:#768692;
+        --box-f:#1c2128; --box-s:#3d444d;
+        --chip-f:#161b22; --chip-s:#3d444d;
+        --ca-f:#11291f; --ca-s:#3fa47f; --ca-t:#8fd6b7;
+        --cb-f:#1e1836; --cb-s:#8b6ce8; --cb-t:#c3b1f7;
+      }
+    }
+    .t{fill:var(--t)} .m{fill:var(--m)}
+    .box{fill:var(--box-f);stroke:var(--box-s)}
     .lbl{font-size:14px;font-weight:600} .sub{font-size:11px} .tiny{font-size:10.5px}
-    .arr{stroke:var(--text-300,#8a98a1);stroke-width:1.6;fill:none;marker-end:url(#a)}
-    .cA{fill:#e9f3ef;stroke:#2f8268} .cAt{fill:#1f5e4b}
-    .cB{fill:#eceafb;stroke:#6d4bd1} .cBt{fill:#4a31a0}
-    .chip{fill:var(--bg-100,#fff);stroke:var(--border-200,#cfd4d8)}
+    .arr{stroke:var(--arr);stroke-width:1.6;fill:none;marker-end:url(#a)}
+    .arrhead{fill:var(--arr)}
+    .cA{fill:var(--ca-f);stroke:var(--ca-s)} .cAt{fill:var(--ca-t)}
+    .cB{fill:var(--cb-f);stroke:var(--cb-s)} .cBt{fill:var(--cb-t)}
+    .chip{fill:var(--chip-f);stroke:var(--chip-s)}
   </style>
   <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
-    <path d="M0,0 L7,3 L0,6 Z" fill="#8a98a1"/></marker></defs>
+    <path d="M0,0 L7,3 L0,6 Z" class="arrhead"/></marker></defs>
 
   <text x="30" y="34" class="t" font-size="20" font-weight="700">personal-corpus</text>
   <text x="30" y="54" class="m" font-size="12">Your data exports → one local DB → two portraits + a substrate for your own apps. Any subset of sources works.</text>

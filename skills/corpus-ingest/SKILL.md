@@ -1,41 +1,61 @@
 ---
 name: corpus-ingest
-description: Parse whatever export files are present and load them into the unified local corpus database. Use when the user has dropped data exports in the exports/ folder and wants to "ingest", "load my data", "build the corpus", or after corpus-collect pulls in a new file. Auto-detects file types, routes each to the right parser, dedupes, and prints a coverage report. Tolerant of missing sources - runs on whatever exists.
+description: "Parses whatever export files are present in exports/ and loads them into the unified local corpus database. Use when the user has dropped data exports in the exports/ folder and wants to ingest, load their data, or build the corpus — or after corpus-collect files a new archive. Auto-detects file types, routes each to the right parser, dedupes on re-runs, supports delta mode for ongoing scans, and prints a coverage report. Tolerant of missing sources: runs on whatever exists."
 ---
 
 # corpus-ingest
 
-Goal: get the files in `exports/` into `corpus.db` cleanly, idempotently, and partial-source-tolerant. Re-running is always safe (content/external-id hashing dedupes).
+Stage 2 of the pipeline (acquire → collect → ingest → profile/analyze).
 
-## How to run
-The engine lives in `engine/`. Point it at the DB (default `corpus.db` at project root) and your `identity.json`.
+Goal: get the files in `exports/` into `corpus.db` cleanly, idempotently, and partial-source-tolerant. Re-running is always safe (content/external-id hashing dedupes). The engine lives in `engine/`; the DB defaults to `corpus.db` at the project root, with identity from `identity.json`.
 
-1. **Detect** what's in `exports/` and map each to a parser kind:
-   | file / folder | kind |
-   |---|---|
-   | `chat.db` | imessage |
-   | `*.mbox` | mbox (gmail) |
-   | `**/messages/inbox/**` | instagram |
-   | `**/messages/**/message_*.json` (FB layout) | facebook |
-   | `data/tweets.js` (or twitter archive) | twitter |
-   | `Google Chat/Groups/*/messages.json` | google_chat |
-   | `Voice/Calls/*.html` | googlevoice |
-   | `_chat.txt` | whatsapp |
-   | Slack export dir | slack |
-   | bookmarks `*.html` | bookmarks |
-   | Spotify/Netflix/Reddit/Yelp CSV/HTML | csv / table parsers |
+## 1. Detect
 
-2. **Ingest** each via `python engine/run_ingest.py <kind> <path> --me <identity>`. For large local DBs (iMessage), the engine uses a fast bulk path. Pass `--dedupe-against imessage` for SMS/Google Voice so text-forwarding overlap collapses.
+Map each file/folder in `exports/` to a parser kind:
 
-3. **Report** coverage: `python engine/coverage.py`.
+| file / folder | kind |
+|---|---|
+| `chat.db` (macOS iMessage) | `imessage` |
+| `*.mbox` (Gmail Sent) | `mbox` |
+| Gmail API threads JSON | `gmailjson` |
+| `**/messages/inbox/**` | `instagram` |
+| `**/messages/**/message_*.json` (FB layout) | `facebook` |
+| `data/tweets.js` (X/Twitter archive) | `twitter` |
+| `Google Chat/Groups/*/messages.json` | `googlechat` |
+| `Voice/Calls/*.html` | `googlevoice` |
+| `_chat.txt` (WhatsApp chat export) | `whatsapp` |
+| `ChatStorage.sqlite` (WhatsApp, iPhone backup) | `whatsapp_ios` |
+| Slack export dir | `slack` |
+| bookmarks `*.html` | `bookmarks` |
+| Netflix viewing-activity export | `netflix` |
+| Yelp export | `yelp` |
+| any tabular file (Spotify, Goodreads, Reddit CSVs) | `csv` + `--source/--bucket/--direction/--map` |
+| JSONL of ready-made Item dicts | `jsonl` + `--source` |
+
+## 2. Ingest
+
+### Initial run
+
+One command per source: `python engine/run_ingest.py <kind> <path> --me <identity>`. Back up the DB first (see below). For large local DBs (iMessage), the engine uses a fast bulk path automatically. Pass `--dedupe-against imessage` for SMS-overlapping sources (e.g. Google Voice when text-forwarding was on) so cross-platform duplicates collapse.
+
+### Ongoing scans (delta mode)
+
+For sources already in the corpus, re-run with `--mode delta` — it only adds items newer than the stored per-source watermark, so refreshing after a new export is fast. A full re-run (default `--mode initial`) is also always safe thanks to dedup, just slower.
+
+## 3. Report
+
+`python engine/coverage.py` — what's in the corpus, which dimensions are thin, and which source would add the most next. Show this to the user after every ingest.
 
 ## Critical operational notes (hard-won)
-- **Back up before any bulk run:** `cp corpus.db corpus.db.bak-$(date +%F-%H%M)`. The engine also refuses to overwrite the store with a DB <90% its size (shrink-guard), and fails loudly if its working-copy step fails - but a backup is the real safety net. NEVER let a failed copy/restore proceed silently into a write.
+
+- **Back up before any bulk run:** `cp corpus.db corpus.db.bak-$(date +%F-%H%M)`. The engine also refuses to overwrite the store with a DB <90% its size (shrink-guard), and fails loudly if its working-copy step fails — but a backup is the real safety net. NEVER let a failed copy/restore proceed silently into a write.
 - **Mounts:** SQLite can't run on FUSE/network mounts (no file locking). The engine operates on a local working copy in `$CORPUS_WORK` (use an ext4 path like `/var/tmp`, NOT a small tmpfs like `/dev/shm`) and syncs bytes back.
 - **Big zips:** extract only what you need (e.g. for Instagram, only `messages/inbox/**/*.json`, skip the photo folders). Stream; don't unpack 600MB to a 4GB disk.
 - **iMessage chat.db:** open with `sqlite3 file:chat.db?immutable=1` (no copy, ignores -wal). Decode `attributedBody` for modern macOS where `text` is NULL.
 
 ## The Item contract (for adding a source)
+
 A parser is a generator yielding dicts; only `bucket`, `source`, `direction` are required:
 `{bucket: signal_in|communication|published, source, direction, ts (ISO), ts_raw, external_id, contact ({name,handle} or str), thread_id, title, body, url, rating, lat, lon, meta (dict)}`.
-Hand them to `Corpus.ingest(source, items, dedupe_against=[...])`. Adding a platform = one generator that yields this shape. Keep raw exports forever; they're the backup of last resort.
+
+Hand them to `Corpus.ingest(source, items, dedupe_against=[...])`. Adding a platform = one generator that yields this shape (details in `docs/ARCHITECTURE.md`). Keep raw exports forever; they're the backup of last resort.
