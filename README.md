@@ -68,13 +68,13 @@ A four-stage pipeline on a shared local SQLite database. Stages talk **only** th
 
 | Stage | Skill | What it does |
 |---|---|---|
-| 1a. Request | `corpus-acquire` | Drives each platform's export UI with the exact settings that keep exports small + parseable, and the traps that silently bloat them. |
-| 1b. Collect | `corpus-collect` | Watches your email for "export ready" notices and files the downloads. Schedulable. |
-| 2. Ingest | `corpus-ingest` | Auto-detects export files, parses each, loads to `corpus.db`. Idempotent, deduped, partial-source-tolerant. |
-| 3. Profile | `corpus-profile` | Produces the **Content Profile** and the **Communication Signature** (fast, repeatable, coverage-aware). |
-| 4. Analyze | `corpus-analyze` | On-demand deep dives — comm patterns, relationship dynamics, interest evolution, timeline. Cited, honest about gaps. |
+| 1a. Request | [`corpus-acquire`](skills/corpus-acquire/SKILL.md) | Drives each platform's export UI with the exact settings that keep exports small + parseable, and the traps that silently bloat them. |
+| 1b. Collect | [`corpus-collect`](skills/corpus-collect/SKILL.md) | Watches your email for "export ready" notices and files the downloads. Schedulable. |
+| 2. Ingest | [`corpus-ingest`](skills/corpus-ingest/SKILL.md) | Auto-detects export files, parses each, loads to `corpus.db`. Idempotent, deduped, partial-source-tolerant. |
+| 3. Profile | [`corpus-profile`](skills/corpus-profile/SKILL.md) | Produces the **Content Profile** and the **Communication Signature** (fast, repeatable, coverage-aware). |
+| 4. Analyze | [`corpus-analyze`](skills/corpus-analyze/SKILL.md) | On-demand deep dives — comm patterns, relationship dynamics, interest evolution, timeline. Cited, honest about gaps. |
 
-Under all of them is the **engine** (`engine/`): one schema, the `Corpus` ingest library, a parser registry, `query.py` read helpers, and `coverage.py`.
+Under all of them is the **engine** (`engine/`): one schema, the `Corpus` ingest library, a parser registry, `query.py` read helpers, and `coverage.py`. The skills encode *judgment* (which export settings, which traps, how to analyze honestly); the engine encodes *mechanism*. Full design rationale in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -96,28 +96,32 @@ Every item lands in exactly one **bucket**, and the bucket decides which goal it
 
 ---
 
-## Quickstart
+## First run
+
+One-time setup, then fire the export requests and ingest as they land.
 
 ```bash
-cp identity.example.json identity.json          # fill in your handles/emails
-# 1. request exports for the sources you have  (skill: corpus-acquire)
-# 2. drop the export files into exports/
-python engine/run_ingest.py <kind> <path> --me "<you>"   # or run skill: corpus-ingest
-python engine/coverage.py                        # what you have + what'd add most
-# 3. build the two portraits  (skill: corpus-profile)
-# 4. go deep on anything       (skill: corpus-analyze)
+mkdir -p exports
+cp identity.example.json identity.json   # fill in your handles/emails — this is how
+                                         # parsers know which messages are YOURS
 ```
 
-A typical first ingest:
-```bash
-python engine/run_ingest.py imessage   exports/chat.db
-python engine/run_ingest.py mbox        exports/Sent.mbox --me you@gmail.com
-python engine/run_ingest.py instagram   exports/instagram --me "Your Name"
-python engine/run_ingest.py googlechat   exports/"Google Chat" --me you@gmail.com
-python engine/run_ingest.py youtube      exports/.../watch-history.html
-python engine/run_ingest.py csv          exports/liked.csv --source spotify_liked \
-    --bucket signal_in --direction liked --map "title=Track Name,ts=Added At"
-```
+1. **Request your exports** — skill `corpus-acquire`. Fires the export request on each platform you use with the settings that keep archives small and parseable. Exports generate asynchronously (minutes to ~24h), so fire them all up front. Local sources (iMessage `chat.db`, browser bookmarks) need no request — just copy them into `exports/`.
+2. **Collect as they land** — skill `corpus-collect`. Watches your inbox for "export ready" emails and files each download into `exports/<platform>/`.
+3. **Ingest** — skill `corpus-ingest`, or run the engine directly. A typical first ingest:
+
+   ```bash
+   python engine/run_ingest.py imessage    exports/chat.db
+   python engine/run_ingest.py mbox        exports/Sent.mbox --me you@gmail.com
+   python engine/run_ingest.py instagram   exports/instagram --me "Your Name"
+   python engine/run_ingest.py googlechat  exports/"Google Chat" --me you@gmail.com
+   python engine/run_ingest.py youtube     exports/.../watch-history.html
+   python engine/run_ingest.py csv         exports/liked.csv --source spotify_liked \
+       --bucket signal_in --direction liked --map "title=Track Name,ts=Added At"
+   ```
+
+4. **Check coverage** — `python engine/coverage.py` shows what you have, which dimensions are thin, and which source would add the most next.
+5. **Build the two portraits** — skill `corpus-profile`. Go deep on anything with `corpus-analyze`.
 
 Then explore the substrate directly:
 ```bash
@@ -132,17 +136,38 @@ The database lands at `corpus.db` in the repo root (git-ignored, never committed
 
 ---
 
+## Ongoing scans
+
+After the first build, keeping the corpus fresh is a light loop:
+
+1. **Schedule `corpus-collect`** (daily is right for most people). Each run scans your inbox for new "export ready" emails, files new arrivals, reports only what changed, and warns before download links expire (typically ~4 days).
+2. **Delta-ingest new arrivals.** Every ingest command accepts `--mode delta`, which only adds items newer than the stored per-source watermark — refreshing a source takes seconds instead of re-parsing everything:
+
+   ```bash
+   python engine/run_ingest.py imessage exports/chat.db --mode delta
+   ```
+
+   A full re-run is also always safe — dedup by external id / content hash makes ingest idempotent — just slower.
+3. **Re-request periodically.** Platform exports are snapshots, so re-fire `corpus-acquire` for your high-churn sources every few months and let the same collect → delta-ingest loop absorb them.
+4. **Refresh the portraits.** Re-run `corpus-profile` after new data lands; it notes what changed since the last profile.
+
+**Back up before bulk runs:** `cp corpus.db corpus.db.bak-$(date +%F-%H%M)`. The engine fails loudly and refuses suspicious shrinking writes, but a backup is the real safety net.
+
+---
+
 ## Supported sources
 
 | Source | kind | Bucket | Goal it feeds |
 |---|---|---|---|
 | iMessage (`chat.db`) | `imessage` | communication | Signature |
 | Gmail (Sent mbox) | `mbox` | communication | Signature (long-form voice) |
+| Gmail (API threads JSON) | `gmailjson` | communication | Signature |
 | Instagram DMs | `instagram` | communication | Signature |
 | Facebook Messenger | `facebook` | communication | Signature |
 | Google Chat / Hangouts | `googlechat` | communication | Signature |
 | Google Voice | `googlevoice` | communication | Signature |
-| WhatsApp | `whatsapp` | communication | Signature |
+| WhatsApp (chat export) | `whatsapp` | communication | Signature |
+| WhatsApp (iPhone backup) | `whatsapp_ios` | communication | Signature |
 | Slack | `slack` | communication | Signature |
 | X / Twitter | `twitter` | published | both |
 | Yelp reviews | `yelp` | published | both |
@@ -151,8 +176,9 @@ The database lands at `corpus.db` in the repo root (git-ignored, never committed
 | Spotify liked | `csv` | signal_in | Content Profile |
 | Netflix | `netflix` | signal_in | Content Profile |
 | Browser bookmarks | `bookmarks` | signal_in | Content Profile |
+| Anything tabular (Goodreads, Reddit CSVs, …) | `csv` / `jsonl` | any | depends |
 
-Adding one is a single generator that yields the Item dict (see `docs/ARCHITECTURE.md`).
+The generic `csv` and `jsonl` kinds take `--source`, `--bucket`, `--direction`, and a `--map` of column names, so most tabular exports work without writing code. Adding a first-class source is a single generator that yields the Item dict (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)).
 
 ---
 
@@ -177,6 +203,6 @@ identity.example.json
 ```
 
 ## Status
-v0.1 — engine + 5 skills + 15 source parsers, smoke-tested. Roadmap: a Reddit parser, a `corpus-merge` for unifying a contact across platforms, and a richer Content Profile module. Contributions welcome.
+v0.1 — engine + 5 skills + 16 source parsers, smoke-tested. Roadmap: a first-class Reddit parser (the GDPR CSVs already load via the generic `csv` kind), a `corpus-merge` for unifying a contact across platforms, and a richer Content Profile module. Contributions welcome.
 
 MIT licensed.
