@@ -6,7 +6,7 @@ The hard problems in a personal-data system are at the edges, not the middle:
 - **Synthesis is generative** (profile/analysis) and benefits from being *separate* from ingestion so it can re-run cheaply.
 - **The middle — a clean store — is stable.** So we make the store the contract and let everything else be independent and replaceable.
 
-Result: a four-stage pipeline where stages communicate ONLY through the local DB. Any stage runs on whatever the previous stage produced. A user with 2 sources and a user with 15 run the same code.
+Result: a four-stage pipeline where stages communicate ONLY through the local DB. Any stage runs on whatever the previous stage produced. A user with 2 sources and a user with 15 run the same code. (Rendered version of this diagram: [`architecture.svg`](architecture.svg), embedded in the README.)
 
 ```
             corpus-acquire        corpus-collect
@@ -31,6 +31,8 @@ Three tables. **items** is the spine — one row per atomic thing (a message, po
 
 Dedup is by `external_id` when the platform gives one, else a content hash of `(source, direction, ts, contact, body[:300])`. Re-ingest is therefore idempotent. Cross-source dedup (e.g. an SMS that also shows in Google Voice) collapses on `(direction, contact, normalized-body)` within a time window.
 
+**Initial vs delta runs:** every ingest records a per-source timestamp watermark. `--mode initial` (the default) parses everything and relies on dedup; `--mode delta` only adds items newer than the watermark, which is what makes cheap recurring scans possible after the first build.
+
 ## The Item contract (how to add any source)
 A parser is a generator yielding plain dicts. Required: `bucket`, `source`, `direction`. Optional but useful:
 ```
@@ -45,7 +47,7 @@ Hand the generator to `Corpus.ingest(source, items, dedupe_against=[...])`. That
 ## Operational invariants (learned the hard way)
 - **Never let a silent copy/restore failure precede a write.** The `Corpus` working-copy step fails loudly; `sync()` refuses to shrink the store below 90% (`CORPUS_ALLOW_SHRINK=1` to override). Back up before bulk runs regardless.
 - **SQLite needs a real filesystem.** On FUSE/network mounts, operate on a local working copy (`CORPUS_WORK` on ext4, not tmpfs) and sync bytes back.
-- **Stream large archives.** Extract only the parse-relevant entries (message JSON, not media). 
+- **Stream large archives.** Extract only the parse-relevant entries (message JSON, not media).
 - **Coverage-first.** `coverage.py` is the contract between "what exists" and "what to claim." Profile/analyze read it and scope themselves.
 
 ## Design choices a re-implementer should keep
