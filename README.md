@@ -8,6 +8,26 @@ Everything runs locally. Your data never leaves your machine. You don't need eve
 
 ---
 
+## The deck
+
+A 125-slide walkthrough of what a personal corpus is, how the pipeline works, and what the two portraits are good for. Four parts: the case for owning the model, the two portraits and the substrate underneath, the five-stage playbook, and the pitch.
+
+- **[View the deck](https://tayloroneal.github.io/personal-signature/deck.html)** (GitHub Pages)
+- Or open [`docs/deck.html`](docs/deck.html) locally. Single self-contained file — no build step, no external assets, no network calls. Works offline.
+
+Arrow keys or click to advance. Press `T` for the thumbnail rail, `P` to print to PDF.
+
+| Part | Slides | Covers |
+|---|---|---|
+| 1 · Own the model of you | 1–43 | What a personal corpus is, why your own trail is high-signal, getting started |
+| 2 · Two portraits and a substrate | 44–74 | Content Profile, Communication Signature, the data model, all supported sources |
+| 3 · The five-stage playbook | 75–105 | acquire, collect, ingest, profile, analyze — and the export traps each one knows |
+| 4 · The pitch | 106–125 | Problem, wedge, positioning, moat, risks, the ask |
+
+The example profile and coverage screenshots throughout use a fictional user — an iOS owner who publishes on Substack — so nothing personal is in the file.
+
+---
+
 ## Why this exists
 
 Every platform you touch already keeps a model of you. Spotify models your taste, Google models your interests, Meta models your relationships, every ad network on the internet stitches fragments of your behavior into a profile. Those models are good. They're just not *yours* — their objective function is someone else's revenue. They predict what you'll click, what you'll buy, what keeps you scrolling. The model of you exists; it's simply aimed away from you.
@@ -197,7 +217,7 @@ This only works because it's local. The whole premise — owning the model inste
 ```
 engine/        schema.sql · corpus.py · parsers/ · run_ingest.py · query.py · coverage.py
 skills/        corpus-acquire · corpus-collect · corpus-ingest · corpus-profile · corpus-analyze
-docs/          ARCHITECTURE.md · architecture.svg · signal.svg
+docs/          ARCHITECTURE.md · architecture.svg · signal.svg · deck.html
 identity.example.json
 .claude-plugin/ plugin.json · marketplace.json   (installable as a Claude plugin)
 ```
