@@ -130,16 +130,15 @@ skills:
       per source, "python engine/run_ingest.py <kind> <path> --me
       <identity>", with --dedupe-against imessage for SMS-overlapping sources
       such as Google Voice; ongoing scans re-run with --mode delta, which
-      only adds items newer than the stored per-source watermark. Report:
+      scans supplied records, skipping known IDs while retaining late arrivals. Report:
       "python engine/coverage.py" shows what is in the corpus, which
       dimensions are thin, and which source would add the most next; shown
       after every ingest. Critical operational notes: back up before any bulk
       run (cp corpus.db corpus.db.bak-$(date +%F-%H%M)); the engine refuses
-      to overwrite the store with a DB under 90% of its size and fails loudly
+      to overwrite the store with a DB under 90% of its original item count and fails loudly
       on a bad copy; SQLite cannot run on FUSE/network mounts, so the engine
       works on a local copy in $CORPUS_WORK; extract only what is needed from
-      big zips; open iMessage chat.db with sqlite3
-      "file:chat.db?immutable=1" and decode attributedBody on modern macOS.
+      big zips; read a consistent iMessage backup in read-only mode and decode attributedBody on modern macOS.
       Adding a source is one generator yielding the Item contract (bucket,
       source, direction required) handed to Corpus.ingest; keep raw exports
       forever as the backup of last resort.
@@ -169,10 +168,10 @@ skills:
       and orders, watch and search themes), and voice (per-register samples
       of the user's OWN words by context, starting from "python
       engine/query.py voice-sample"). Writes two artifacts:
-      Signature-Profile.md, a one-page profile with a one-line read,
+      private/Signature-Profile.md, a one-page profile with a one-line read,
       who-they-are-in-the-data, trends, relationships, voice summary, and
       coverage caveats, with non-obvious findings marked explicitly; and
-      voice-signature.md, a drop-in system-prompt block ("Write as <name>:
+      private/voice-signature.md, a drop-in system-prompt block ("Write as <name>:
       ...") plus a register map, tics and tells, do/don't, and light stats,
       with every trait backed by a verbatim line from the corpus. Principles:
       coverage-aware (scope claims to the sources present), non-obvious over

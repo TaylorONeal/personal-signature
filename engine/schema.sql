@@ -5,7 +5,7 @@ PRAGMA journal_mode = DELETE;   -- FUSE/network mounts can't host WAL; DELETE is
 
 -- ---------------------------------------------------------------- items
 CREATE TABLE IF NOT EXISTS items (
-  id           TEXT PRIMARY KEY,         -- sha1(source|external_id) or sha1(source|dir|ts|contact|body[:300])
+  id           TEXT PRIMARY KEY,         -- v2 account-scoped external ID or full identifying-content hash
   bucket       TEXT NOT NULL,            -- signal_in | communication | published
   source       TEXT NOT NULL,            -- e.g. imessage, gmail, instagram_dm, spotify_liked
   source_account TEXT,                   -- which account (personal vs work), optional
