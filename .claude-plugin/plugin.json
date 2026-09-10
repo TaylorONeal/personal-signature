@@ -1,7 +1,7 @@
 {
   "name": "personal-corpus",
   "version": "0.1.0",
-  "description": "Turn your personal-data exports into one local, queryable corpus, then build an honest profile, voice signature, and deep analysis. Works with any subset of sources. Local-only.",
+  "description": "Turn your personal-data exports into one local, queryable corpus, then build an honest profile, voice signature, and deep analysis. Works with any subset of sources. The engine stores data locally; agent privacy depends on your provider.",
   "author": { "name": "personal-corpus contributors" },
   "license": "MIT",
   "keywords": ["personal-data", "data-export", "quantified-self", "voice-signature", "takeout", "privacy"],
