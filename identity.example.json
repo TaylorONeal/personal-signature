@@ -1,22 +1,22 @@
 {
   "_comment": "Copy to identity.json and fill in. This is how parsers know which messages are YOURS (direction = sent/out) vs others. Nothing here leaves your machine.",
   "display_name": "Your Name",
-  "emails": ["you@gmail.com", "you@work.com"],
+  "emails": ["you@example.com", "you@work.example"],
   "phones": ["+15551234567"],
   "handles": {
-    "imessage": ["you@gmail.com", "+15551234567"],
+    "imessage": ["you@example.com", "+15551234567"],
     "instagram": "Your Name As It Appears In IG Export",
     "facebook": "Your Name",
-    "twitter": "yourhandle",
-    "google_chat": "you@gmail.com",
+    "twitter": "123456789",
+    "google_chat": "you@example.com",
     "google_voice": "Me",
-    "slack": "Your Slack Display Name",
+    "slack": "U012EXAMPLE",
     "reddit": "your_reddit_username",
     "youtube": ["@yourchannel", "@yourotherchannel"]
   },
   "_notes": {
     "instagram": "Use the exact sender_name string from your IG message JSON (open one message_1.json and copy the value).",
     "google_voice": "Google Voice marks your own messages with the literal name 'Me' - leave as 'Me' unless yours differs.",
-    "twitter": "Handle without the @, as it appears in your archive's account.js."
+    "twitter": "Numeric account ID from account.js (accountId), not the display handle."
   }
 }

@@ -12,7 +12,7 @@ CLI:
   python query.py interests [N]        # saved + published items, for the content profile
   python query.py search "<fts query>"
 """
-import sys, os, json, re, collections
+import sys, os, json, re, collections, argparse
 sys.path.insert(0, os.path.dirname(__file__))
 from corpus import Corpus
 
@@ -24,7 +24,7 @@ STOP = set("the a an and or but if then of to in on for with at by from is are w
 
 
 def _c():
-    return Corpus(DB)
+    return Corpus(DB, readonly=True)
 
 
 def stats(c):
@@ -84,25 +84,40 @@ def search(c, q, n=30):
         "ORDER BY ts DESC LIMIT ?", (q, n))]
 
 
+def main():
+    ap = argparse.ArgumentParser(description="Read the local corpus without modifying it")
+    ap.add_argument("command", nargs="?", default="stats", choices=["stats", "top-contacts", "top-sources", "monthly", "voice-sample", "interests", "search"])
+    ap.add_argument("argument", nargs="?")
+    ap.add_argument("--db", default=DB)
+    a = ap.parse_args()
+    n = None
+    if a.command in {"top-contacts", "voice-sample", "interests"}:
+        try:
+            n = int(a.argument or {"top-contacts": 20, "voice-sample": 500, "interests": 1000}[a.command])
+            if not 1 <= n <= 10000:
+                raise ValueError()
+        except ValueError:
+            ap.error("Sample size must be between 1 and 10000")
+    if a.command == "search" and not a.argument:
+        ap.error("search requires a full-text query")
+    with Corpus(a.db, readonly=True) as c:
+        if a.command == "stats":
+            result = stats(c)
+        elif a.command == "top-contacts":
+            result = top_contacts(c, n)
+        elif a.command == "top-sources":
+            result = top_sources(c)
+        elif a.command == "monthly":
+            result = monthly(c)
+        elif a.command == "voice-sample":
+            result = voice_sample(c, n)
+        elif a.command == "interests":
+            rows = interests(c, n)
+            result = {"count": len(rows), "keywords": keyword_freq(rows)}
+        else:
+            result = search(c, a.argument)
+        print(json.dumps(result, indent=2))
+
+
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "stats"
-    arg = sys.argv[2] if len(sys.argv) > 2 else None
-    c = _c()
-    if cmd == "stats":
-        print(json.dumps(stats(c), indent=2))
-    elif cmd == "top-contacts":
-        print(json.dumps(top_contacts(c, int(arg or 20)), indent=2))
-    elif cmd == "top-sources":
-        print(json.dumps(top_sources(c), indent=2))
-    elif cmd == "monthly":
-        print(json.dumps(monthly(c), indent=2))
-    elif cmd == "voice-sample":
-        print(json.dumps(voice_sample(c, int(arg or 500)), indent=2))
-    elif cmd == "interests":
-        rows = interests(c, int(arg or 1000))
-        print(json.dumps({"count": len(rows), "keywords": keyword_freq(rows)}, indent=2))
-    elif cmd == "search":
-        print(json.dumps(search(c, arg or ""), indent=2))
-    else:
-        print("unknown command:", cmd)
-    c.close()
+    main()

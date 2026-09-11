@@ -14,3 +14,26 @@ __pycache__/
 
 # os
 .DS_Store
+
+# Private derivatives, alternate databases, scratch/backup files and credentials
+private/
+profiles/
+analysis/
+analyses/
+Signature-Profile.md
+voice-signature.md
+*.db
+*.db-*
+*.db.*
+*.sqlite
+*.sqlite-*
+*.sqlite.*
+*.sqlite3
+*.sqlite3-*
+*.sqlite3.*
+.corpus-*.tmp
+.env
+.env.*
+!.env.example
+*.pem
+*.key
