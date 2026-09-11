@@ -29,9 +29,9 @@ Result: a four-stage pipeline where stages communicate ONLY through the local DB
 ## The data model
 Three tables. **items** is the spine — one row per atomic thing (a message, post, like, ride, review). Every item has a **bucket**: `communication` | `published` | `signal_in`. **contacts** are the other parties (deduped by normalized handle, with optional relationship/status labels). **sources** is a hint registry; sources auto-register on first ingest.
 
-Dedup is by `external_id` when the platform gives one, else a content hash of `(source, direction, ts, contact, body[:300])`. Re-ingest is therefore idempotent. Cross-source dedup (e.g. an SMS that also shows in Google Voice) collapses on `(direction, contact, normalized-body)` within a time window.
+Dedup is by source, account, and `external_id` when the platform gives one, else a content hash of `(source, account, direction, ts, contact, thread_id, title, body, url)`. Re-ingest is therefore idempotent. Cross-source dedup (e.g. an SMS that also shows in Google Voice) collapses on `(direction, contact, normalized-body)` within a time window.
 
-**Initial vs delta runs:** every ingest records a per-source timestamp watermark. `--mode initial` (the default) parses everything and relies on dedup; `--mode delta` only adds items newer than the watermark, which is what makes cheap recurring scans possible after the first build.
+**Initial vs delta runs:** every ingest records a per-source timestamp watermark. `--mode initial` (the default) parses everything and relies on dedup; `--mode delta` scans all supplied records and deduplicates by stable ID; watermarks are informational, so late arrivals are not lost.
 
 ## The Item contract (how to add any source)
 A parser is a generator yielding plain dicts. Required: `bucket`, `source`, `direction`. Optional but useful:
@@ -46,7 +46,7 @@ Hand the generator to `Corpus.ingest(source, items, dedupe_against=[...])`. That
 
 ## Operational invariants (learned the hard way)
 - **Never let a silent copy/restore failure precede a write.** The `Corpus` working-copy step fails loudly; `sync()` refuses to shrink the store below 90% (`CORPUS_ALLOW_SHRINK=1` to override). Back up before bulk runs regardless.
-- **SQLite needs a real filesystem.** On FUSE/network mounts, operate on a local working copy (`CORPUS_WORK` on ext4, not tmpfs) and sync bytes back.
+- **SQLite needs a real filesystem.** Working copies are private and temporary. Stores require atomic rename and exclusive file creation; unsupported mounts fail closed. Use a local filesystem.
 - **Stream large archives.** Extract only the parse-relevant entries (message JSON, not media).
 - **Coverage-first.** `coverage.py` is the contract between "what exists" and "what to claim." Profile/analyze read it and scope themselves.
 
@@ -54,3 +54,23 @@ Hand the generator to `Corpus.ingest(source, items, dedupe_against=[...])`. That
 - One flat `items` table over per-source tables: lets profile/analyze be source-agnostic and makes partial coverage a non-event.
 - Buckets over free-form tags: three is enough to drive the three synthesis dimensions (relationships, voice, interests) and keeps queries simple.
 - Skills are thin; the engine is the substance. The skills encode *judgment* (which export settings, which traps, how to analyze honestly); the engine encodes *mechanism*.
+
+## Storage lifecycle and failure handling
+
+Writers reserve `<db>.lock` exclusively, create a mode-0700 temporary directory,
+and create a mode-0600 working database. Existing stores are copied with SQLite's
+backup API. Schema/ID migration happens only on this working copy. Each ingest is
+one savepoint: items, contacts, search rows, and watermarks roll back together.
+Context-manager exceptions discard the working session. Successful close publishes
+a mode-0600 same-directory temporary file using atomic replace. Rename failure
+never falls back to truncating the original. The 90% item-count shrink guard remains.
+Readers use escaped `mode=ro` URIs and never initialize schemas or publish copies.
+
+Only one toolkit writer may operate per store. External writers are unsupported:
+metadata change detection and sidecar checks reject observed external changes, but
+are not a distributed locking protocol. Crash recovery and privacy limits are in
+[SECURITY.md](../SECURITY.md). A lock left by a crash is never automatically removed.
+
+The current cross-source suppression is opt-in and heuristic: exact normalized
+full body, direction, contact, and a five-minute timestamp window. Missing timestamps
+or contacts do not establish a duplicate. Inspect counts before enabling it.

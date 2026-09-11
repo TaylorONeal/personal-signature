@@ -4,7 +4,7 @@
 
 <p align="center"><img src="docs/signal.svg" alt="Reclaim the model: your behavior is the highest-signal data about you that exists. Right now it trains someone else's model of you — to sell to you. personal-corpus builds it for you instead: a Content Profile, a Communication Signature, and a queryable substrate for your own AI apps." width="860"></p>
 
-Everything runs locally. Your data never leaves your machine. You don't need every source — the whole system is built to work with whatever subset you have, and to tell you, honestly, what's thin.
+The Python engine runs locally without network calls. A connected or cloud AI can receive any corpus content you give it; use local inference to keep analysis on your machine. You don't need every source — the whole system is built to work with whatever subset you have, and to tell you, honestly, what's thin.
 
 ---
 
@@ -110,23 +110,26 @@ Every item lands in exactly one **bucket**, and the bucket decides which goal it
 
 `items` is the spine (one row per atomic thing). `contacts` are the other parties (deduped by normalized handle, with optional relationship labels). `sources` is a hint registry; sources auto-register on first ingest.
 
-**Identity:** `identity.json` is how parsers decide direction — if a message's sender matches one of your handles it's `out`/`sent`/`posted` (yours), else `in`/`received`. This is what makes the Communication Signature possible.
+**Identity:** the CLI reads `identity.json` (or `--identity PATH`); explicit `--me` / `--handle` take precedence. Use `--account` to separate accounts. Identity is how parsers decide direction — if a message's sender matches one of your handles it's `out`/`sent`/`posted` (yours), else `in`/`received`. This is what makes the Communication Signature possible.
 
-**Dedup:** by `external_id` when the platform provides one, else a content hash. Re-ingest is always safe. Cross-source dedup collapses the same message arriving on two platforms (e.g. an SMS that also shows in Google Voice).
+**Dedup:** by source, account, and `external_id` when the platform provides one, else a hash of full identifying content. Re-ingest with the same parser and account is idempotent. Cross-source dedup collapses the same message arriving on two platforms (e.g. an SMS that also shows in Google Voice).
 
 ---
 
 ## First run
 
-One-time setup, then fire the export requests and ingest as they land.
+Requires Python 3.9+ with SQLite FTS5; no pip dependencies. No web server, account, or API key is needed for the engine. Agent skills require a separately configured agent.
+
+One-time setup, then request only the exports you want to analyze.
 
 ```bash
-mkdir -p exports
+umask 077
+mkdir -p exports private
 cp identity.example.json identity.json   # fill in your handles/emails — this is how
                                          # parsers know which messages are YOURS
 ```
 
-1. **Request your exports** — skill `corpus-acquire`. Fires the export request on each platform you use with the settings that keep archives small and parseable. Exports generate asynchronously (minutes to ~24h), so fire them all up front. Local sources (iMessage `chat.db`, browser bookmarks) need no request — just copy them into `exports/`.
+1. **Request your exports** — skill `corpus-acquire`. Fires the export request on each platform you use with the settings that keep archives small and parseable. Exports generate asynchronously (minutes to ~24h), so fire them all up front. Local sources need no export request. Create a consistent SQLite backup of iMessage into `exports/` (see SECURITY.md); export browser bookmarks as HTML.
 2. **Collect as they land** — skill `corpus-collect`. Watches your inbox for "export ready" emails and files each download into `exports/<platform>/`.
 3. **Ingest** — skill `corpus-ingest`, or run the engine directly. A typical first ingest:
 
@@ -161,17 +164,17 @@ The database lands at `corpus.db` in the repo root (git-ignored, never committed
 After the first build, keeping the corpus fresh is a light loop:
 
 1. **Schedule `corpus-collect`** (daily is right for most people). Each run scans your inbox for new "export ready" emails, files new arrivals, reports only what changed, and warns before download links expire (typically ~4 days).
-2. **Delta-ingest new arrivals.** Every ingest command accepts `--mode delta`, which only adds items newer than the stored per-source watermark — refreshing a source takes seconds instead of re-parsing everything:
+2. **Delta-ingest new arrivals.** Every ingest command accepts `--mode delta`, which scans the supplied export and skips known IDs, retaining late arrivals and records with equal timestamps:
 
    ```bash
    python engine/run_ingest.py imessage exports/chat.db --mode delta
    ```
 
-   A full re-run is also always safe — dedup by external id / content hash makes ingest idempotent — just slower.
+   A full re-run is also always safe — dedup by external id / content hash makes ingest idempotent — with the same correctness guarantees.
 3. **Re-request periodically.** Platform exports are snapshots, so re-fire `corpus-acquire` for your high-churn sources every few months and let the same collect → delta-ingest loop absorb them.
 4. **Refresh the portraits.** Re-run `corpus-profile` after new data lands; it notes what changed since the last profile.
 
-**Back up before bulk runs:** `cp corpus.db corpus.db.bak-$(date +%F-%H%M)`. The engine fails loudly and refuses suspicious shrinking writes, but a backup is the real safety net.
+**Back up before bulk runs:** `cp corpus.db corpus.db.bak-$(date +%F-%H%M)` while all database writers are stopped (use SQLite backup for live sources). The engine fails loudly and refuses suspicious shrinking writes, but a backup is the real safety net.
 
 ---
 
@@ -206,9 +209,9 @@ The generic `csv` and `jsonl` kinds take `--source`, `--bucket`, `--direction`, 
 
 This only works because it's local. The whole premise — owning the model instead of renting it from a platform — falls apart the moment the data leaves your machine.
 
-- **Local only.** The DB never leaves your machine. No cloud, no telemetry.
+- **Local engine.** No network calls or telemetry in the Python engine. SQLite is not encrypted; cloud agents, connectors, synced folders, backups, and shared outputs have separate privacy boundaries. See [SECURITY.md](SECURITY.md).
 - The AI is instructed to **never enter your passwords or 2FA** (it hands those steps to you), **never write sensitive personal/relationship/health detail into persistent memory**, and to keep deep analyses in a clearly-marked local folder.
-- **Back up before bulk runs.** The engine fails loud on a bad copy and refuses to overwrite the store with a DB <90% its size (shrink-guard); a timestamped backup is still the real safety net.
+- **Back up before bulk runs.** The engine fails loud on a bad copy and refuses to overwrite the store with a DB containing <90% of its original item count (shrink-guard); a timestamped backup is still the real safety net.
 - **Keep your raw exports.** They're the backup of last resort.
 
 ---
@@ -223,6 +226,18 @@ identity.example.json
 ```
 
 ## Status
-v0.1 — engine + 5 skills + 16 source parsers, smoke-tested. Roadmap: a first-class Reddit parser (the GDPR CSVs already load via the generic `csv` kind), a `corpus-merge` for unifying a contact across platforms, and a richer Content Profile module. Contributions welcome.
+v0.1 — local Python engine, 5 agent skills, and 17 CLI kinds (including generic CSV/JSONL). Security and data-integrity regression tests are in `tests/`. Roadmap: a first-class Reddit parser (the GDPR CSVs already load via the generic `csv` kind), a `corpus-merge` for unifying a contact across platforms, and a richer Content Profile module. Contributions welcome.
 
 MIT licensed.
+
+## Development and review
+
+Run `python3 -m unittest discover -s tests -v` and `python3 -m compileall -q engine tests`.
+Tests use temporary synthetic data only. Do not attach real exports to issues or PRs.
+
+- [Documentation index](docs/INDEX.md)
+- [Security policy and recovery](SECURITY.md)
+- [Security review and validation](docs/SECURITY_REVIEW.md)
+- [Contribution guide](CONTRIBUTING.md)
+
+`--db PATH` selects an ingest or query database. Back up existing databases before first use of this revision: item IDs migrate to account-scoped v2 hashes, preserving row IDs and search indexes. Prior discarded records cannot be reconstructed without raw exports. `--mode delta` now parses the supplied snapshot fully; this costs more parsing time but retains late arrivals. `bulk_ingest` uses the streaming ingest path instead of buffering all rows.

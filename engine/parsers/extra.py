@@ -2,6 +2,7 @@
 Netflix, Yelp). Each is a generator yielding the standard Item dict; see
 docs/ARCHITECTURE.md for the contract. Stdlib only."""
 import os, re, html, json, glob, csv, datetime
+from pathlib import Path
 
 
 def _iso_dt(s, fmts):
@@ -36,7 +37,7 @@ def parse_google_chat(root, me_email):
         gi = os.path.join(d, "group_info.json")
         if os.path.exists(gi):
             try:
-                g = json.load(open(gi, encoding="utf-8"))
+                g = json.loads(Path(gi).read_text(encoding="utf-8"))
                 gname = g.get("name")
                 for mem in g.get("members", []):
                     if (mem.get("email") or "").lower() != me:
@@ -46,16 +47,16 @@ def parse_google_chat(root, me_email):
                 pass
         is_dm = gid.startswith("DM")
         try:
-            data = json.load(open(mf, encoding="utf-8"))
-        except Exception:
-            continue
+            data = json.loads(Path(mf).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError("Cannot read Google Chat export JSON") from exc
         for m in data.get("messages", []):
             text = m.get("text")
             if not text:
                 continue
             cr = m.get("creator") or {}
             cemail = (cr.get("email") or "").lower()
-            out = cemail == me
+            out = bool(me) and cemail == me
             if is_dm:
                 contact = {"name": pname or (None if out else cr.get("name")),
                            "handle": pemail or (None if out else cemail) or pname}
@@ -82,7 +83,7 @@ _YT = re.compile(
 
 def parse_youtube_watch(path):
     """Takeout YouTube 'history/watch-history.html'."""
-    t = open(path, encoding="utf-8", errors="ignore").read()
+    t = Path(path).read_text(encoding="utf-8", errors="replace")
     for url, vid, title, channel, date in _YT.findall(t):
         yield {"bucket": "signal_in", "source": "youtube_watch", "direction": "watched",
                "external_id": f"{vid}-{date}",
@@ -98,7 +99,8 @@ def parse_netflix(root):
     def rows(name):
         p = os.path.join(root, name)
         if os.path.exists(p):
-            yield from csv.DictReader(open(p, encoding="utf-8-sig", errors="ignore", newline=""))
+            with open(p, encoding="utf-8-sig", newline="") as f:
+                yield from csv.DictReader(f)
     for r in rows("ViewingActivity.csv"):
         yield {"bucket": "signal_in", "source": "netflix_viewing", "direction": "watched",
                "ts": _iso_loose(r.get("Start Time")), "ts_raw": r.get("Start Time"),
@@ -119,7 +121,7 @@ def parse_netflix(root):
 
 # ------------------------------------------------------- Yelp (HTML tables)
 def _yelp_rows(path):
-    t = open(path, encoding="utf-8", errors="ignore").read()
+    t = Path(path).read_text(encoding="utf-8", errors="replace")
     hdr = None
     for b in re.findall(r"<tr[^>]*>.*?</tr>", t, flags=re.S):
         cells = [re.sub(r"[ \t]+", " ", html.unescape(re.sub(r"<[^>]+>", " ", c)).strip())
