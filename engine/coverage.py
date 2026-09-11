@@ -6,6 +6,7 @@ you have, flags thin dimensions, and recommends the highest-value next source to
 Usage: python coverage.py [db_path]
 """
 import sys, os, sqlite3, json
+from corpus import open_readonly
 
 DB = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "corpus.db")
 
@@ -33,7 +34,7 @@ SUGGESTIONS = {
 def main():
     if not os.path.exists(DB):
         print(f"No corpus DB at {DB}. Run ingest first."); return
-    c = sqlite3.connect(f"file:{os.path.abspath(DB)}?immutable=1", uri=True)
+    c = open_readonly(DB)
     total = c.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     print(f"# Corpus coverage  ({total:,} items)\n")
 
