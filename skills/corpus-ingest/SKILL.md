@@ -77,3 +77,16 @@ archive content. The Python CLI accepts extracted files/directories, not ZIP arc
 Use `--db`, `--account`, and `--identity` when defaults are unsuitable. Twitter DMs
 need the numeric account ID; Slack needs your member ID via `--me` or identity.json.
 After coverage review, hand off to `corpus-profile` or `corpus-analyze`.
+
+## Limits and identity corrections
+
+Review the CLI diagnostics for missing timestamps and unknown directions. No recognized
+rows is an error unless an empty source is intentional (`--allow-empty`). Inputs are
+bounded to 64 MiB per JSON/HTML document or mbox message, 1 MiB per text line, and
+1 GiB/10,000 entries per input tree by default; `--max-input-mb` and `--max-items`
+set explicit CLI budgets. Split oversized documents; never bypass limits silently.
+Use `--date-order dmy|mdy` and a stable `--thread` for WhatsApp text. National phone
+numbers have no assumed country. `--contact-aliases private/contact-aliases.json`
+can map known raw handles to canonical handles without rewriting historical contacts.
+Do not infer aliases from a shared display name. Distinct content sharing an export
+ID is retained as a variant; parser corrections may add historical variants once.

@@ -10,7 +10,7 @@ An Item dict uses these keys (all optional except bucket, source, direction):
 Dedupe: versioned, account-scoped source/external ID or full identifying content hash.
 Re-running an ingest is therefore idempotent.
 """
-import sqlite3, hashlib, json, os, datetime, re, shutil, tempfile
+import sqlite3, hashlib, json, os, datetime, re, shutil, tempfile, math
 
 SCHEMA = os.path.join(os.path.dirname(__file__), "schema.sql")
 
@@ -20,6 +20,7 @@ def open_readonly(path):
     from pathlib import Path
     db = sqlite3.connect(Path(path).absolute().as_uri() + "?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
+    db.execute("PRAGMA trusted_schema=OFF")
     db.execute("PRAGMA query_only=ON")
     return db
 
@@ -42,13 +43,20 @@ def norm_handle(handle):
         return s
     digits = re.sub(r"\D", "", s)
     if re.fullmatch(r"[+()\d .-]+", s) and len(digits) >= 10:
-        # Keep explicit international numbers intact; legacy national numbers use +1.
-        return "+" + digits if s.startswith("+") or len(digits) >= 11 else "+1" + digits
+        # Preserve national numbers without guessing their country.
+        return ("+" if s.startswith("+") else "") + digits
     return s.lstrip("@")                               # username
 
 
 class Corpus:
-    def __init__(self, db_path, readonly=False):
+    def __init__(self, db_path, readonly=False, contact_aliases=None, max_items=1000000):
+        self.contact_aliases = contact_aliases or {}
+        if not isinstance(self.contact_aliases, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip()
+                for k, v in self.contact_aliases.items()):
+            raise ValueError("Contact aliases must map nonempty handles to canonical handles")
+        self.contact_aliases = {norm_handle(k): norm_handle(v) for k, v in self.contact_aliases.items()}
+        self.max_items = max_items
         self.store_path = os.path.abspath(db_path)
         self.readonly = readonly
         self._scratch = None
@@ -56,7 +64,27 @@ class Corpus:
         self.db = None
         self.lock_path = self.store_path + ".lock"
         if readonly:
-            self.db = open_readonly(self.store_path)
+            # Release the source handle before returning (Windows blocks rename of open files).
+            # Queries use an isolated snapshot and never publish it back to the store.
+            try:
+                src = open_readonly(self.store_path)
+                try:
+                    self._scratch = tempfile.TemporaryDirectory(prefix="corpus-read-", dir=os.environ.get("CORPUS_WORK"))
+                    self.work_path = os.path.join(self._scratch.name, "corpus.db")
+                    fd = os.open(self.work_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    os.close(fd)
+                    target = sqlite3.connect(self.work_path)
+                    try:
+                        src.backup(target)
+                        target.execute("PRAGMA journal_mode=DELETE")
+                    finally:
+                        target.close()
+                finally:
+                    src.close()
+                self.db = open_readonly(self.work_path)
+            except BaseException:
+                self.close(save=False)
+                raise
             return
         # A private parent is required: same-user processes are outside this boundary.
         if os.path.islink(self.store_path):
@@ -131,6 +159,8 @@ class Corpus:
                 os.unlink(tmp)
 
     def init_schema(self):
+        if self.db.execute("PRAGMA user_version").fetchone()[0] > 2:
+            raise ValueError("Corpus schema is newer than this engine; upgrade before writing")
         with open(os.path.abspath(SCHEMA)) as f:
             self.db.executescript(f.read())
         if self.db.execute("PRAGMA user_version").fetchone()[0] < 2:
@@ -150,6 +180,7 @@ class Corpus:
         else:
             name, handle = None, contact
         key = norm_handle(handle)
+        key = self.contact_aliases.get(key, key)
         if not key:
             return None
         cid = _sha1("contact", key)
@@ -225,9 +256,18 @@ class Corpus:
         ext = it.get("external_id")
         cid = self.resolve_contact(it.get("contact"))
         iid = self.item_id(it, cid)
-        exists = self.db.execute("SELECT 1 FROM items WHERE id=?", (iid,)).fetchone()
+        exists = self.db.execute("SELECT * FROM items WHERE id=?", (iid,)).fetchone()
         if exists:
-            return False
+            # Export-generated IDs can collide. Keep differing evidence instead of losing it.
+            fields = ("bucket", "direction", "ts", "contact_id", "thread_id", "title", "body", "url", "rating", "lat", "lon")
+            incoming = dict(it, contact_id=cid)
+            if all(exists[k] == incoming.get(k) for k in fields) and json.loads(exists["meta"] or "{}") == it.get("meta", {}):
+                return False
+            variant = json.dumps([incoming.get(k) for k in fields] + [it.get("meta", {})],
+                                 sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            iid = hashlib.sha256((iid + ":" + variant).encode("utf-8")).hexdigest()
+            if self.db.execute("SELECT 1 FROM items WHERE id=?", (iid,)).fetchone():
+                return False
         self.db.execute(
             "INSERT INTO items(id,bucket,source,source_account,external_id,direction,ts,ts_raw,"
             "contact_id,thread_id,title,body,url,rating,lat,lon,meta,run_id) "
@@ -289,9 +329,11 @@ class Corpus:
             wm = self.get_watermark(source, account)
             run_id = self.start_run(source, mode)
             xidx = self._build_xsource_index(dedupe_against) if dedupe_against else None
-            added = skipped = xdup = 0
+            added = skipped = xdup = missing_ts = unknown_direction = 0
             max_ts = wm["last_ts"]
-            for it in items:
+            for row_number, it in enumerate(items, 1):
+                if row_number > self.max_items:
+                    raise ValueError("Ingest exceeds item budget; split the input or increase --max-items")
                 if not isinstance(it, dict):
                     raise ValueError("Each item must be an object")
                 it = dict(it)
@@ -301,6 +343,21 @@ class Corpus:
                     raise ValueError("Item bucket must be communication, published, or signal_in")
                 if not isinstance(it.get("source"), str) or not it["source"]:
                     raise ValueError("Item source must be a nonempty string")
+                for field in ("direction", "ts", "ts_raw", "thread_id", "title", "body", "url", "source_account"):
+                    if it.get(field) is not None and not isinstance(it[field], str):
+                        raise ValueError(f"Item {row_number}: {field} must be text or null")
+                if not isinstance(it.get("meta", {}), dict):
+                    raise ValueError(f"Item {row_number}: meta must be an object")
+                for field in ("rating", "lat", "lon"):
+                    if it.get(field) is not None:
+                        try:
+                            it[field] = float(it[field])
+                            if not math.isfinite(it[field]):
+                                raise ValueError()
+                        except (TypeError, ValueError):
+                            raise ValueError(f"Item {row_number}: {field} must be a finite number") from None
+                missing_ts += not bool(it.get("ts"))
+                unknown_direction += not bool(it.get("direction"))
                 if xidx is not None:
                     cid = self.resolve_contact(it.get("contact"))
                     if self._is_xsource_dupe(xidx, it, cid):
@@ -317,7 +374,8 @@ class Corpus:
             self.finish_run(run_id, added, skipped, note=f"xsource_dupes={xdup}" if xidx is not None else "")
             self.db.execute("RELEASE ingest_run")
             return {"source": source, "mode": mode, "added": added, "skipped": skipped,
-                    "cross_source_dupes": xdup, "watermark": max_ts}
+                    "cross_source_dupes": xdup, "watermark": max_ts,
+                    "diagnostics": {"missing_timestamps": missing_ts, "unknown_direction": unknown_direction}}
         except BaseException:
             self.db.execute("ROLLBACK TO ingest_run")
             self.db.execute("RELEASE ingest_run")
