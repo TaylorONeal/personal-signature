@@ -37,3 +37,6 @@ voice-signature.md
 !.env.example
 *.pem
 *.key
+
+# Browser development dependencies
+node_modules/

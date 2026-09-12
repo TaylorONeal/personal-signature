@@ -57,6 +57,7 @@ def voice_sample(c, n=500):
     return [dict(r) for r in c.db.execute(
         "SELECT source,ts,title,body FROM items "
         "WHERE direction IN ('out','sent','posted') AND body IS NOT NULL AND length(body)>3 "
+        "AND COALESCE(json_extract(meta, '$.retweet'), 0)=0 "
         "ORDER BY ts DESC LIMIT ?", (n,))]
 
 

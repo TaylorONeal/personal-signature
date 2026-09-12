@@ -70,3 +70,15 @@ For a vulnerability, use GitHub's private vulnerability reporting for this repos
 if enabled. If it is unavailable, open a minimal issue requesting a private channel,
 without personal data or exploit details. This project does not promise a response SLA.
 See [the review](docs/SECURITY_REVIEW.md) for tested changes and limitations.
+
+## Follow-up protections
+
+Query snapshots release the source file before returning, including on Windows.
+Whole-document parsers cap reads at 64 MiB, text lines at 1 MiB, and the CLI limits
+input trees/bytes/items before publishing. Exceeding a limit or recognizing no rows
+fails without publishing the working copy. These limits are not a native-code sandbox.
+
+National phone numbers have no assumed country. Use explicit local contact aliases
+when mapping them to canonical handles. Unknown/changed export layouts need coverage
+review; do not infer completeness from successful parsing alone. See
+[verification and compatibility](docs/VERIFICATION.md) for supported boundaries.

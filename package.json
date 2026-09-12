@@ -1,0 +1,6 @@
+{
+  "name": "personal-corpus-verification",
+  "private": true,
+  "scripts": {"test:deck": "node scripts/test_deck.cjs"},
+  "devDependencies": {"playwright": "1.63.0"}
+}
