@@ -96,3 +96,7 @@ It writes two artifacts: `private/Signature-Profile.md`, a one-page profile with
 - **Open-ended "non-obvious":** scan for cross-source agreements and contradictions; report what a stranger couldn't guess.
 
 Method for every module: compute, don't intuit (write the query, get the numbers, cite them inline); state the pattern plainly, then lead with the strongest counter-reading (what else could produce these numbers?); caveat the data (sample size, missing directions/sources, eras not captured; a claim resting on a thin slice is flagged, never laundered as a finding); and end with a falsifiable next step, one concrete experiment or query. Guardrails: don't over-pathologize; separate description from prescription; name patterns clearly, even uncomfortable ones, but as hypotheses about behavior, not verdicts about the person; keep sensitive analyses (relationships, health, psychology) in a local, clearly-marked folder and never persist them to cross-session memory; no specifics/names in pattern write-ups unless the user explicitly asks; and if the data genuinely can't answer the question, say so: "not enough signal" is a valid result.
+
+Import limits, empty-source errors, explicit phone aliases and WhatsApp date/thread
+settings are documented in [corpus-ingest](corpus-ingest/SKILL.md) and
+[verification](../docs/VERIFICATION.md). Always inspect diagnostics and coverage.

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'engine'))
 from corpus import Corpus
@@ -22,7 +23,7 @@ class ParserTests(unittest.TestCase):
 
     def test_imessage_readonly_fixture(self):
         path = self.root/'chat.db'
-        with sqlite3.connect(path) as c:
+        with closing(sqlite3.connect(path)) as c, c:
             c.executescript('''CREATE TABLE message(text,attributedBody,is_from_me,date,handle_id);
             CREATE TABLE handle(id); CREATE TABLE chat(chat_identifier);
             CREATE TABLE chat_message_join(message_id,chat_id);
@@ -35,7 +36,7 @@ class ParserTests(unittest.TestCase):
 
     def test_whatsapp_sqlite_readonly_fixture(self):
         path = self.root/'ChatStorage.sqlite'
-        with sqlite3.connect(path) as c:
+        with closing(sqlite3.connect(path)) as c, c:
             c.executescript('''CREATE TABLE ZWAMESSAGE(ZTEXT,ZISFROMME,ZMESSAGEDATE,ZCHATSESSION);
             CREATE TABLE ZWACHATSESSION(Z_PK,ZPARTNERNAME,ZCONTACTJID);
             INSERT INTO ZWAMESSAGE VALUES('hello',0,1000000000,1);

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'engine'))
@@ -85,9 +86,9 @@ class EngineTests(unittest.TestCase):
         self.seed()
         with self.assertRaisesRegex(RuntimeError, 'changed'):
             with Corpus(self.path) as c:
-                with sqlite3.connect(self.path) as other:
+                with closing(sqlite3.connect(self.path)) as other, other:
                     other.execute("INSERT INTO sources(name) VALUES('external')")
-        with open_readonly(self.path) as c:
+        with closing(open_readonly(self.path)) as c:
             self.assertIsNotNone(c.execute("SELECT 1 FROM sources WHERE name='external'").fetchone())
 
     def test_exception_discards_whole_cli_session(self):
@@ -132,7 +133,7 @@ class EngineTests(unittest.TestCase):
 
     def test_migration_retains_fts_and_dedup(self):
         self.seed()
-        with sqlite3.connect(self.path) as c:
+        with closing(sqlite3.connect(self.path)) as c, c:
             c.execute("UPDATE items SET id='legacy-id'")
             c.execute('PRAGMA user_version=0')
         with Corpus(self.path) as c:
@@ -154,7 +155,7 @@ class EngineTests(unittest.TestCase):
                 c.ingest('test', [{'bucket': 'bad'}])
 
     def test_escaped_uri_filename(self):
-        special = self.root / 'corpus?#.db'
+        special = self.root / ('corpus#.db' if os.name == 'nt' else 'corpus?#.db')
         with Corpus(special) as c:
             c.ingest('test', [item()])
         with Corpus(special, readonly=True) as c:
@@ -198,7 +199,7 @@ class EngineTests(unittest.TestCase):
 
     def test_csv_validation_and_bom_import(self):
         csv = self.root/'data.csv'
-        csv.write_text('\ufeffTitle\nExample\n')
+        csv.write_text('\ufeffTitle\nExample\n', encoding='utf-8')
         self.assertNotEqual(self.cli('csv', str(csv)).returncode, 0)
         self.assertFalse(self.path.exists())
         result = self.cli('csv', str(csv), '--source', 'example', '--bucket', 'signal_in', '--direction', 'liked', '--map', 'title=Title', '--account', 'one')

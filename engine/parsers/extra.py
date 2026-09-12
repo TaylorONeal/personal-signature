@@ -2,7 +2,9 @@
 Netflix, Yelp). Each is a generator yielding the standard Item dict; see
 docs/ARCHITECTURE.md for the contract. Stdlib only."""
 import os, re, html, json, glob, csv, datetime
+from contextlib import closing
 from pathlib import Path
+from input_safety import read_text, json_document, text_lines
 
 
 def _iso_dt(s, fmts):
@@ -18,11 +20,15 @@ def _iso_dt(s, fmts):
 
 
 def _iso_loose(s):
-    m = re.match(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})", str(s or ""))
-    if m:
-        return m.group(1) + "T" + m.group(2)
-    m = re.match(r"(\d{4}-\d{2}-\d{2})", str(s or ""))
-    return m.group(1) if m else None
+    if not s:
+        return None
+    try:
+        dt = datetime.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        return dt.isoformat()
+    except ValueError:
+        return None
 
 
 # ------------------------------------------------------- Google Chat / Hangouts
@@ -37,17 +43,17 @@ def parse_google_chat(root, me_email):
         gi = os.path.join(d, "group_info.json")
         if os.path.exists(gi):
             try:
-                g = json.loads(Path(gi).read_text(encoding="utf-8"))
+                g = json_document(gi)
                 gname = g.get("name")
                 for mem in g.get("members", []):
                     if (mem.get("email") or "").lower() != me:
                         pname = pname or mem.get("name")
                         pemail = pemail or mem.get("email")
-            except Exception:
-                pass
+            except (OSError, ValueError) as exc:
+                raise ValueError("Cannot read Google Chat group metadata") from exc
         is_dm = gid.startswith("DM")
         try:
-            data = json.loads(Path(mf).read_text(encoding="utf-8"))
+            data = json_document(mf)
         except (OSError, ValueError) as exc:
             raise ValueError("Cannot read Google Chat export JSON") from exc
         for m in data.get("messages", []):
@@ -83,7 +89,7 @@ _YT = re.compile(
 
 def parse_youtube_watch(path):
     """Takeout YouTube 'history/watch-history.html'."""
-    t = Path(path).read_text(encoding="utf-8", errors="replace")
+    t = read_text(path, errors="replace")
     for url, vid, title, channel, date in _YT.findall(t):
         yield {"bucket": "signal_in", "source": "youtube_watch", "direction": "watched",
                "external_id": f"{vid}-{date}",
@@ -99,7 +105,7 @@ def parse_netflix(root):
     def rows(name):
         p = os.path.join(root, name)
         if os.path.exists(p):
-            with open(p, encoding="utf-8-sig", newline="") as f:
+            with closing(text_lines(p)) as f:
                 yield from csv.DictReader(f)
     for r in rows("ViewingActivity.csv"):
         yield {"bucket": "signal_in", "source": "netflix_viewing", "direction": "watched",
@@ -121,7 +127,7 @@ def parse_netflix(root):
 
 # ------------------------------------------------------- Yelp (HTML tables)
 def _yelp_rows(path):
-    t = Path(path).read_text(encoding="utf-8", errors="replace")
+    t = read_text(path, errors="replace")
     hdr = None
     for b in re.findall(r"<tr[^>]*>.*?</tr>", t, flags=re.S):
         cells = [re.sub(r"[ \t]+", " ", html.unescape(re.sub(r"<[^>]+>", " ", c)).strip())
