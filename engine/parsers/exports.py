@@ -26,6 +26,23 @@ def _iso(dt):
     return str(dt)
 
 
+def _sender_address(value):
+    """Extract one mailbox conservatively across Python's changing email strictness.
+
+    A display name containing an email address must never establish authorship.
+    Ambiguous/multiple senders remain unclassified rather than guessed.
+    """
+    value = re.sub(r"\r?\n[ \t]+", " ", str(value or "")).strip()
+    if "<" in value or ">" in value:
+        match = re.fullmatch(r"[^<>\r\n]*<([^<>\r\n]+)>\s*", value)
+        if not match:
+            return None
+        value = match.group(1).strip()
+    if not re.fullmatch(r'[^@\s<>,;()"]+@[^@\s<>,;()"]+', value):
+        return None
+    return value.lower()
+
+
 # ---------------- email (mbox from Takeout / Thunderbird / etc.) ----------------
 def parse_mbox(path, my_addresses, source="gmail", account=""):
     me = {a.lower() for a in my_addresses}
@@ -39,9 +56,9 @@ def parse_mbox(path, my_addresses, source="gmail", account=""):
             try:
                 frm = getaddresses(msg.get_all("from", []))
                 tos = getaddresses(msg.get_all("to", []) + msg.get_all("cc", []))
-                from_addr = (frm[0][1] if frm else "").lower()
-                direction = "sent" if from_addr in me else "received"
-                counterpart = tos[0] if direction == "sent" and tos else (frm[0] if frm else ("", ""))
+                from_addr = _sender_address(msg.get("from"))
+                direction = ("sent" if from_addr in me else "received") if from_addr else None
+                counterpart = tos[0] if direction == "sent" and tos else ((frm[0][0] if frm else ""), from_addr)
                 try:
                     ts = _iso(parsedate_to_datetime(msg.get("date")))
                 except Exception:
@@ -76,14 +93,15 @@ def parse_gmail_threads_json(path, my_emails, source="gmail", account=""):
     for th in data.get("threads", []):
         for m in th.get("messages", []):
             sender = (m.get("sender") or "").lower()
-            is_sent = bool(me.intersection(addr.lower() for _, addr in getaddresses([sender])))
+            address = _sender_address(sender)
+            is_sent = address in me if address else False
             tos = m.get("toRecipients") or []
             if is_sent:
                 counterpart = tos[0] if tos else sender
                 direction = "sent"
             else:
-                counterpart = m.get("sender")
-                direction = "received"
+                counterpart = address
+                direction = "received" if address else None
             body = html.unescape(m.get("snippet") or "")
             yield {
                 "bucket": "communication", "source": source, "source_account": account,

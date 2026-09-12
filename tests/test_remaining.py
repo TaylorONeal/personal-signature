@@ -185,3 +185,13 @@ class VoiceTests(unittest.TestCase):
             with Corpus(Path(temp)/'corpus.db') as c:
                 c.ingest('twitter',[dict(source='twitter_posts',bucket='published',direction='posted',body='RT other words',meta={'retweet':True}),dict(source='twitter_posts',bucket='published',direction='posted',body='My original words')])
                 self.assertEqual([r['body'] for r in voice_sample(c)],['My original words'])
+
+
+class SenderCompatibilityTests(unittest.TestCase):
+    def test_ambiguous_sender_is_unclassified(self):
+        from parsers.exports import _sender_address
+        self.assertEqual(_sender_address('you@example.com <attacker@example.net>'),'attacker@example.net')
+        self.assertEqual(_sender_address('"Display Name" <you@example.com>'),'you@example.com')
+        self.assertIsNone(_sender_address('you@example.com, attacker@example.net'))
+        self.assertIsNone(_sender_address('You <you@example.com>, Other <other@example.com>'))
+        self.assertIsNone(_sender_address('you@example.com\r\nBcc: other@example.com'))
