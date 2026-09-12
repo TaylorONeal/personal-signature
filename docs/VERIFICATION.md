@@ -73,3 +73,5 @@ It runs in CI as well. After editing the inline script, run
   documented in SECURITY.md. There is no automatic stale-lock deletion.
 - Source acquisition and cloud AI/provider behavior remain external trust boundaries;
   the engine does not enter credentials, extract archives, or upload personal data.
+
+Sender parsing uses a conservative single-mailbox extraction across Python versions; ambiguous headers are unclassified rather than matched against email-like display names.
