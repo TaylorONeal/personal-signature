@@ -4,6 +4,8 @@ Stdlib only. Optional fields may be absent; malformed structured exports fail th
 """
 import os, json, csv, glob, html, sqlite3, datetime, re, mailbox
 from pathlib import Path
+from input_safety import read_text, json_document, text_lines, MAX_DOCUMENT_BYTES
+from email import message_from_bytes
 from contextlib import closing
 from email.utils import parsedate_to_datetime, getaddresses
 from corpus import open_readonly
@@ -28,7 +30,12 @@ def _iso(dt):
 def parse_mbox(path, my_addresses, source="gmail", account=""):
     me = {a.lower() for a in my_addresses}
     with closing(mailbox.mbox(path, create=False)) as messages:
-        for msg in messages:
+        for key in messages.iterkeys():
+            with closing(messages.get_file(key)) as raw:
+                data = raw.read(MAX_DOCUMENT_BYTES + 1)
+            if len(data) > MAX_DOCUMENT_BYTES:
+                raise ValueError("Mbox message exceeds 64 MiB")
+            msg = message_from_bytes(data)
             try:
                 frm = getaddresses(msg.get_all("from", []))
                 tos = getaddresses(msg.get_all("to", []) + msg.get_all("cc", []))
@@ -55,7 +62,7 @@ def parse_mbox(path, my_addresses, source="gmail", account=""):
                     "ts_raw": msg.get("date"),
                     "contact": {"name": counterpart[0], "handle": counterpart[1]},
                     "thread_id": msg.get("In-Reply-To") or next(iter(msg.get("References", "").split()), None),
-                    "title": msg.get("subject"), "body": body[:20000],
+                    "title": msg.get("subject"), "body": body,
                     "meta": {"to": [a for _, a in tos]},
                 }
             except (OSError, ValueError) as exc:
@@ -65,7 +72,7 @@ def parse_mbox(path, my_addresses, source="gmail", account=""):
 # ---------------- Gmail search_threads JSON (from the connector, saved to a file) ----------------
 def parse_gmail_threads_json(path, my_emails, source="gmail", account=""):
     me = {e.lower() for e in my_emails}
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json_document(path)
     for th in data.get("threads", []):
         for m in th.get("messages", []):
             sender = (m.get("sender") or "").lower()
@@ -139,56 +146,53 @@ def parse_imessage(chatdb_path):
 
 
 # ---------------- Instagram DMs (Download Your Information, JSON) ----------------
-def parse_instagram_dm(root, my_name):
-    for inbox in glob.glob(os.path.join(root, "**", "messages", "inbox", "*"), recursive=True):
-        for jf in glob.glob(os.path.join(inbox, "message_*.json")):
-            try:
-                data = json.loads(Path(jf).read_text(encoding="utf-8"))
-            except (OSError, ValueError) as exc:
-                raise ValueError("Cannot read export JSON") from exc
-            thread = data.get("title")
-            for m in data.get("messages", []):
-                sender = m.get("sender_name", "")
-                content = m.get("content")
-                if not content:
-                    continue
-                yield {
-                    "bucket": "communication", "source": "instagram_dm",
-                    "external_id": f"ig-{thread}-{m.get('timestamp_ms')}",
-                    "direction": "sent" if sender == my_name else "received",
-                    "ts": _iso((m.get("timestamp_ms") or 0) / 1000),
-                    "contact": sender if sender != my_name else thread,
-                    "thread_id": thread, "body": content,
-                }
-
-
-# ---------------- Facebook Messenger (DYI JSON, same shape as IG) ----------------
-def parse_facebook_messenger(root, my_name):
-    for jf in glob.glob(os.path.join(root, "**", "message_*.json"), recursive=True):
-        try:
-            data = json.loads(Path(jf).read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise ValueError("Cannot read export JSON") from exc
-        thread = data.get("title")
-        for m in data.get("messages", []):
+def _parse_meta_messages(files, my_name, source, prefix):
+    for jf in sorted(files):
+        data = json_document(jf)
+        if not isinstance(data, dict) or not isinstance(data.get("messages"), list):
+            raise ValueError("Meta export must contain a messages array")
+        title = data.get("title")
+        thread = Path(jf).parent.name
+        participants = [p.get("name") for p in data.get("participants", []) if p.get("name")]
+        others = [name for name in participants if name != my_name]
+        is_group = len(participants) != 2
+        for m in data["messages"]:
+            sender = m.get("sender_name")
             content = m.get("content")
             if not content:
-                continue
-            sender = m.get("sender_name", "")
+                continue  # Media-only records do not contain voice text.
+            outgoing = bool(my_name) and sender == my_name
+            if outgoing:
+                contact = ({"name": title or thread, "handle": f"{source}:group:{thread}"}
+                           if is_group else {"name": others[0], "handle": f"{source}:person:{others[0]}"})
+            else:
+                contact = {"name": sender, "handle": f"{source}:person:{sender}"} if sender else None
+            millis = m.get("timestamp_ms")
             yield {
-                "bucket": "communication", "source": "facebook_msgr",
-                "external_id": f"fb-{thread}-{m.get('timestamp_ms')}",
-                "direction": "sent" if sender == my_name else "received",
-                "ts": _iso((m.get("timestamp_ms") or 0) / 1000),
-                "contact": sender if sender != my_name else thread,
-                "thread_id": thread, "body": content,
+                "bucket": "communication", "source": source,
+                # Preserve the old ID family; Corpus retains variants when these collide.
+                "external_id": f"{prefix}-{title}-{millis}",
+                "direction": ("sent" if outgoing else "received") if sender else None,
+                "ts": _iso(millis / 1000) if isinstance(millis, (int, float)) else None,
+                "contact": contact, "thread_id": thread, "body": content,
+                "meta": {"thread_title": title, "is_group": is_group},
             }
+
+
+def parse_instagram_dm(root, my_name):
+    files = glob.glob(os.path.join(root, "**", "message_*.json"), recursive=True)
+    yield from _parse_meta_messages(files, my_name, "instagram_dm", "ig")
+
+
+def parse_facebook_messenger(root, my_name):
+    files = glob.glob(os.path.join(root, "**", "message_*.json"), recursive=True)
+    yield from _parse_meta_messages(files, my_name, "facebook_msgr", "fb")
 
 
 # ---------------- Twitter / X archive (data/*.js -> JSON after stripping assignment) ----------------
 def _load_twitter_js(path):
-    raw = Path(path).read_text(encoding="utf-8")
-    raw = raw[raw.find("=") + 1:].strip()
+    raw = read_text(path)
+    raw = raw[raw.find("=") + 1:].strip().removesuffix(";")
     return json.loads(raw)
 
 
@@ -238,7 +242,7 @@ def parse_slack_export(root, workspace="", my_ids=()):
     users = {}
     uf = os.path.join(root, "users.json")
     if os.path.exists(uf):
-        for u in json.loads(Path(uf).read_text(encoding="utf-8")):
+        for u in json_document(uf):
             users[u["id"]] = u.get("real_name") or u.get("name")
     for chan_dir in sorted(glob.glob(os.path.join(root, "*"))):
         if not os.path.isdir(chan_dir):
@@ -246,7 +250,7 @@ def parse_slack_export(root, workspace="", my_ids=()):
         channel = os.path.basename(chan_dir)
         for jf in sorted(glob.glob(os.path.join(chan_dir, "*.json"))):
             try:
-                msgs = json.loads(Path(jf).read_text(encoding="utf-8"))
+                msgs = json_document(jf)
             except (OSError, ValueError) as exc:
                 raise ValueError("Cannot read export JSON") from exc
             for m in msgs:
@@ -257,13 +261,15 @@ def parse_slack_export(root, workspace="", my_ids=()):
                     "bucket": "communication", "source": "slack", "source_account": workspace,
                     "external_id": f"{channel}-{m.get('ts')}",
                     "direction": ("sent" if uid in my_ids else "received") if my_ids else None, "ts": _iso(float(m["ts"])) if m.get("ts") else None,
-                    "contact": users.get(uid, uid), "thread_id": channel, "body": m["text"],
+                    "contact": ({"name": channel, "handle": f"slack:{workspace}:channel:{channel}"}
+                                if uid in my_ids else {"name": users.get(uid, uid), "handle": f"slack:{workspace}:user:{uid}"}) if uid else None,
+                    "thread_id": channel, "body": m["text"],
                 }
 
 
 # ---------------- Browser bookmarks (Netscape HTML export) ----------------
 def parse_bookmarks_html(path):
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    text = read_text(path, errors="replace")
     for m in re.finditer(r'<A[^>]*HREF="([^"]+)"([^>]*)>(.*?)</A>', text, re.I | re.S):
         url, attrs, title = m.group(1), m.group(2), html.unescape(m.group(3))
         add = re.search(r'ADD_DATE="(\d+)"', attrs)
@@ -296,7 +302,7 @@ def parse_google_voice(root, my_name="Me"):
         if rectype not in ("Text", "Voicemail"):
             continue
         try:
-            txt = Path(hf).read_text(encoding="utf-8", errors="replace")
+            txt = read_text(hf, errors="replace")
         except (OSError, ValueError) as exc:
             raise ValueError("Cannot read export JSON") from exc
         partner_is_num = partner.startswith("+") or partner.replace(" ", "").isdigit()
@@ -309,9 +315,12 @@ def parse_google_voice(root, my_name="Me"):
                 continue
             dtm, fnm, telm = _GV_DT.search(b), _GV_FN.search(b), _GV_TEL.search(b)
             ts = dtm.group(1) if dtm else None
+            raw_ts = ts
             if ts:
-                m2 = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", ts)
-                ts = m2.group(1) if m2 else ts
+                try:
+                    ts = _iso(datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")))
+                except ValueError:
+                    ts = None
             fn = fnm.group(1).strip() if fnm else ""
             is_me = fn == my_name
             name = None if partner_is_num else partner
@@ -321,7 +330,7 @@ def parse_google_voice(root, my_name="Me"):
             yield {
                 "bucket": "communication", "source": "google_voice",
                 "direction": "out" if is_me else "in",
-                "ts": ts, "ts_raw": ts, "contact": contact, "body": body,
+                "ts": ts, "ts_raw": raw_ts, "contact": contact, "body": body,
                 "meta": {"record": rectype.lower(), "partner": partner},
             }
 
@@ -331,9 +340,11 @@ _WA_IOS = re.compile(r"^‎?\[(\d{1,2}/\d{1,2}/\d{2,4}),\s+([\d:]+\s*[AP]?M?)\]\
 _WA_AND = re.compile(r"^(\d{1,2}/\d{1,2}/\d{2,4}),\s+([\d:]+\s*[AP]?M?)\s-\s([^:]+?):\s?(.*)$")
 
 
-def _wa_ts(date, time):
+def _wa_ts(date, time, date_order="mdy"):
     for fmt in ("%m/%d/%y %I:%M:%S %p", "%m/%d/%Y %I:%M:%S %p", "%m/%d/%y %I:%M %p",
-                "%m/%d/%Y %I:%M %p", "%m/%d/%y %H:%M", "%m/%d/%Y %H:%M"):
+                "%m/%d/%Y %I:%M %p", "%m/%d/%y %H:%M", "%m/%d/%Y %H:%M", "%m/%d/%y %H:%M:%S", "%m/%d/%Y %H:%M:%S"):
+        if date_order == "dmy":
+            fmt = fmt.replace("%m/%d", "%d/%m")
         try:
             return datetime.datetime.strptime(f"{date} {time}".strip(), fmt).replace(microsecond=0).isoformat()
         except ValueError:
@@ -341,15 +352,15 @@ def _wa_ts(date, time):
     return None
 
 
-def parse_whatsapp(path, my_name, contact_hint=None):
-    with open(path, encoding="utf-8", errors="replace") as messages:
-        yield from _whatsapp_lines(messages, my_name, contact_hint)
+def parse_whatsapp(path, my_name, contact_hint=None, date_order="mdy"):
+    with closing(text_lines(path)) as messages:
+        yield from _whatsapp_lines(messages, my_name, contact_hint, date_order)
 
 
-def _whatsapp_lines(messages, my_name, contact_hint):
+def _whatsapp_lines(messages, my_name, contact_hint, date_order="mdy"):
     cur = None
     for raw in messages:
-        line = raw.rstrip("\n")
+        line = raw.rstrip("\r\n").replace("\u202f", " ").replace("\u200e", "")
         m = _WA_IOS.match(line) or _WA_AND.match(line)
         if m:
             if cur:
@@ -361,10 +372,15 @@ def _whatsapp_lines(messages, my_name, contact_hint):
             cur = {
                 "bucket": "communication", "source": "whatsapp",
                 "direction": "sent" if sender.strip() == my_name else "received",
-                "ts": _wa_ts(date, time), "ts_raw": f"{date} {time}",
+                "ts": _wa_ts(date, time, date_order), "ts_raw": f"{date} {time}",
                 "contact": sender.strip() if sender.strip() != my_name else (contact_hint or "whatsapp"),
-                "thread_id": contact_hint, "body": body,
+                "thread_id": contact_hint, "body": body, "meta": {"date_order": date_order},
             }
+        elif re.match(r"^\[?\d{1,2}/\d{1,2}/\d{2,4},", line):
+            # A timestamped system notice is not a continuation of someone's words.
+            if cur:
+                yield cur
+            cur = None
         elif cur is not None and line.strip():
             cur["body"] = (cur["body"] + "\n" + line).strip()
     if cur:
@@ -389,7 +405,7 @@ def parse_whatsapp_ios(chatstorage_path, my_name="Me"):
         for r in con.execute(q):
             md = r["mdate"]
             ts = _iso((md or 0) + APPLE_EPOCH) if md else None
-            contact = r["partner"] or r["jid"]
+            contact = {"name": r["partner"], "handle": r["jid"]} if r["jid"] else r["partner"]
             yield {
                 "bucket": "communication", "source": "whatsapp",
                 "direction": "sent" if r["fromme"] else "received",
@@ -403,8 +419,11 @@ def parse_whatsapp_ios(chatstorage_path, my_name="Me"):
 # ---------------- Generic CSV mapper (Goodreads, Letterboxd, Readwise, Reddit, LinkedIn, exportify) ----------------
 def parse_csv(path, source, bucket, direction, field_map):
     """field_map maps item keys -> csv column names, e.g. {'body':'Review','ts':'Date','rating':'Rating'}."""
-    with open(path, encoding="utf-8-sig", errors="strict", newline="") as f:
-        for row in csv.DictReader(f):
+    with closing(text_lines(path)) as f:
+        reader = csv.DictReader(f)
+        if not set(field_map.values()).issubset(reader.fieldnames or []):
+            raise ValueError("CSV is missing one or more mapped columns")
+        for row in reader:
             it = {"bucket": bucket, "source": source, "direction": direction, "meta": {}}
             for k, col in field_map.items():
                 if col in row and row[col] != "":

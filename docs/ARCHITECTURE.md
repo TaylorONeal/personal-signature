@@ -64,7 +64,7 @@ one savepoint: items, contacts, search rows, and watermarks roll back together.
 Context-manager exceptions discard the working session. Successful close publishes
 a mode-0600 same-directory temporary file using atomic replace. Rename failure
 never falls back to truncating the original. The 90% item-count shrink guard remains.
-Readers use escaped `mode=ro` URIs and never initialize schemas or publish copies.
+Readers take private SQLite snapshots using escaped `mode=ro` source URIs, then release the source file. They query their snapshot read-only and never initialize schemas or publish copies. This permits writer replacement while readers are active on Windows.
 
 Only one toolkit writer may operate per store. External writers are unsupported:
 metadata change detection and sidecar checks reject observed external changes, but
@@ -74,3 +74,17 @@ are not a distributed locking protocol. Crash recovery and privacy limits are in
 The current cross-source suppression is opt-in and heuristic: exact normalized
 full body, direction, contact, and a five-minute timestamp window. Missing timestamps
 or contacts do not establish a duplicate. Inspect counts before enabling it.
+
+## Follow-up integrity and input rules
+
+Source IDs are claims, not proof of uniqueness. When a matching ID has different
+content, the engine retains a deterministic variant using a hash of the full
+comparison payload (including ratings, location and metadata). Re-ingest skips exact
+matches. No existing records are deleted. Phone normalization never invents a country;
+explicit one-step contact aliases can map national handles to known canonical handles.
+Parser corrections can create additional historical variants; see VERIFICATION.md.
+
+The CLI inspects input type/tree/bytes before opening a writer and rejects an empty
+recognized result by default. Whole-document reads, streamed lines and item counts
+are bounded. Twitter's mixed-source records stream through one ingest run rather than
+being buffered by source. Watermarks are informational; item IDs decide duplicates.
