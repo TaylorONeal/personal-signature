@@ -15,7 +15,7 @@ A 125-slide walkthrough of what a personal corpus is, how the pipeline works, an
 - **[View the deck](https://tayloroneal.github.io/personal-signature/deck.html)** (GitHub Pages)
 - Or open [`docs/deck.html`](docs/deck.html) locally. Single self-contained file — no build step, no external assets, no network calls. Works offline.
 
-Arrow keys or click to advance. Press `T` for the thumbnail rail, `P` to print to PDF.
+Use the Previous/Next buttons or arrow keys. Press `T` for the slide list, `P` to print to PDF; Home/End jump to the first/last slide.
 
 | Part | Slides | Covers |
 |---|---|---|
@@ -118,7 +118,7 @@ Every item lands in exactly one **bucket**, and the bucket decides which goal it
 
 ## First run
 
-Requires Python 3.9+ with SQLite FTS5; no pip dependencies. No web server, account, or API key is needed for the engine. Agent skills require a separately configured agent.
+Use maintained Python 3.11+ with SQLite FTS5 and JSON support; no pip dependencies. No web server, account, or API key is needed for the engine. Agent skills require a separately configured agent.
 
 One-time setup, then request only the exports you want to analyze.
 
@@ -241,3 +241,23 @@ Tests use temporary synthetic data only. Do not attach real exports to issues or
 - [Contribution guide](CONTRIBUTING.md)
 
 `--db PATH` selects an ingest or query database. Back up existing databases before first use of this revision: item IDs migrate to account-scoped v2 hashes, preserving row IDs and search indexes. Prior discarded records cannot be reconstructed without raw exports. `--mode delta` now parses the supplied snapshot fully; this costs more parsing time but retains late arrivals. `bulk_ingest` uses the streaming ingest path instead of buffering all rows.
+
+### Import diagnostics and limits
+
+Imports fail when no records are recognized, unless you pass `--allow-empty`.
+Results include counts of missing timestamps and unknown directions; inspect coverage
+before drawing conclusions. The CLI rejects symlinks/devices and limits input to
+1 GiB and 10,000 directory entries by default. `--max-input-mb` and `--max-items`
+(default 1,000,000) allow explicit budgets. Whole JSON/HTML documents and mbox messages
+are capped at 64 MiB; streamed text lines at 1 MiB. Split oversized exports into valid
+smaller files. CSV mappings must name actual columns.
+
+For WhatsApp text use `--date-order dmy` or `--date-order mdy` and a stable
+`--thread` identifier (otherwise the filename stem is used). Do not reuse the same
+thread name for unrelated chats. Use `--account` for separate accounts. National
+phone numbers have no assumed country; explicit contact mappings can be supplied
+with `--contact-aliases private/contact-aliases.json`. Existing contacts are preserved.
+When an external ID collides with different content, both variants are retained.
+
+[Verification and compatibility](docs/VERIFICATION.md) explains the test matrix,
+optional browser tests, migration choices, and supported storage boundaries.
