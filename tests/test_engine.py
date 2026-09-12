@@ -199,7 +199,7 @@ class EngineTests(unittest.TestCase):
 
     def test_csv_validation_and_bom_import(self):
         csv = self.root/'data.csv'
-        csv.write_text('\ufeffTitle\nExample\n')
+        csv.write_text('\ufeffTitle\nExample\n', encoding='utf-8')
         self.assertNotEqual(self.cli('csv', str(csv)).returncode, 0)
         self.assertFalse(self.path.exists())
         result = self.cli('csv', str(csv), '--source', 'example', '--bucket', 'signal_in', '--direction', 'liked', '--map', 'title=Title', '--account', 'one')
