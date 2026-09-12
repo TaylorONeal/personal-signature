@@ -78,7 +78,7 @@ compatibility. No personal corpus, credentials, or account exports were used.
 
 ## Verification
 
-- Python regression suite: **54 tests**, including one contract test exercising all
+- Python regression suite: **55 tests**, including one contract test exercising all
   **17 CLI kinds twice**, plus a 10,000-record repeat-ingest case.
 - Compilation and diff whitespace checks.
 - Offline Chromium verification of all 125 slides and 125-page PDF output.
@@ -110,3 +110,5 @@ Python CLI. The review therefore uses repository evidence, synthetic regression 
 and the documented [Python SQLite APIs](https://docs.python.org/3/library/sqlite3.html)
 and [SQLite backup API](https://www.sqlite.org/backup.html). Frontend guidance was
 applied to the standalone deck. These checks are not a guarantee of absence of defects.
+
+Sender parsing uses a conservative single-mailbox extraction across Python versions; ambiguous headers are unclassified rather than matched against email-like display names.
