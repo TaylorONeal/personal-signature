@@ -14,9 +14,12 @@ Examples:
         --direction liked --map "title=Title,rating=My Rating,ts=Date Added"
 All commands accept --mode delta; stable IDs retain late arrivals while skipping duplicates.
 """
-import sys, os, json, argparse
+import sys, os, json, argparse, sqlite3
+from contextlib import closing
+from input_safety import inspect_input, json_document, text_lines
 sys.path.insert(0, os.path.dirname(__file__))
 from corpus import Corpus
+from pathlib import Path
 from parsers import exports as ex
 from parsers import extra as ex2
 
@@ -24,7 +27,7 @@ DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "corpus.db"))
 
 
 def jsonl_items(path):
-    with open(path, encoding="utf-8") as f:
+    with closing(text_lines(path)) as f:
         for line in f:
             line = line.strip()
             if line:
@@ -41,6 +44,12 @@ def main():
     ap.add_argument("--handle")
     ap.add_argument("--workspace", default="")
     ap.add_argument("--account", default="")
+    ap.add_argument("--contact-aliases", help="JSON mapping of raw handles to explicit canonical handles")
+    ap.add_argument("--date-order", choices=["mdy", "dmy"], default="mdy", help="WhatsApp numeric date order")
+    ap.add_argument("--thread", help="Stable chat identifier for WhatsApp text exports")
+    ap.add_argument("--max-input-mb", type=int, default=1024)
+    ap.add_argument("--max-items", type=int, default=1000000)
+    ap.add_argument("--allow-empty", action="store_true", help="Permit an intentionally empty export")
     ap.add_argument("--source")
     ap.add_argument("--bucket")
     ap.add_argument("--direction")
@@ -48,6 +57,10 @@ def main():
     ap.add_argument("--mode", default="initial", choices=["initial", "delta"])
     ap.add_argument("--dedupe-against", help="comma-separated sources to suppress cross-platform dupes, e.g. imessage")
     a = ap.parse_args()
+    if a.max_input_mb < 1 or a.max_items < 1:
+        ap.error("Input and item budgets must be positive")
+    inspect_input(a.path, max_bytes=a.max_input_mb * 1024 * 1024)
+    aliases = json_document(a.contact_aliases) if a.contact_aliases else None
     if not os.path.exists(a.path):
         ap.error("Input path does not exist")
     directory_kinds = {"instagram", "facebook", "twitter", "slack", "googlevoice", "googlechat", "netflix", "yelp"}
@@ -68,8 +81,7 @@ def main():
             ap.error("--map contains an unsupported field or empty column")
     if os.path.exists(a.identity):
         try:
-            with open(a.identity, encoding="utf-8") as f:
-                identity = json.load(f)
+            identity = json_document(a.identity)
             handles = identity.get("handles", {})
             key = {"googlechat": "google_chat", "googlevoice": "google_voice"}.get(a.kind, a.kind)
             value = identity.get("emails", []) if a.kind in {"mbox", "gmailjson"} else handles.get(key, [])
@@ -87,7 +99,7 @@ def main():
         ap.error("Twitter DMs require --handle with the numeric account ID")
     against = a.dedupe_against.split(",") if a.dedupe_against else None
 
-    with Corpus(a.db) as c:
+    with Corpus(a.db, contact_aliases=aliases, max_items=a.max_items) as c:
         k = a.kind
         if k == "mbox":
             src = a.source or "gmail"
@@ -100,14 +112,7 @@ def main():
         elif k == "facebook":
             res = c.ingest("facebook_msgr", ex.parse_facebook_messenger(a.path, a.me[0] if a.me else ""), mode=a.mode, account=a.account)
         elif k == "twitter":
-            # twitter archive yields 3 sources; route each by its own source tag
-            added = skipped = 0
-            buf = {}
-            for it in ex.parse_twitter_archive(a.path, a.handle or ""):
-                buf.setdefault(it["source"], []).append(it)
-            res = {}
-            for src, lst in buf.items():
-                res[src] = c.ingest(src, lst, mode=a.mode, account=a.account)
+            res = c.ingest("twitter", ex.parse_twitter_archive(a.path, a.handle or ""), mode=a.mode, account=a.account)
         elif k == "slack":
             res = c.ingest("slack", ex.parse_slack_export(a.path, a.account or a.workspace, a.me), mode=a.mode, account=a.account or a.workspace)
         elif k == "gmailjson":
@@ -115,7 +120,7 @@ def main():
             items = ex.parse_gmail_threads_json(a.path, a.me, source=src, account=a.account)
             res = c.ingest(src, items, mode=a.mode, account=a.account)
         elif k == "whatsapp":
-            items = ex.parse_whatsapp(a.path, a.me[0] if a.me else "", contact_hint=a.account or None)
+            items = ex.parse_whatsapp(a.path, a.me[0] if a.me else "", contact_hint=a.thread or Path(a.path).stem, date_order=a.date_order)
             res = c.ingest("whatsapp", items, mode=a.mode, account=a.account, dedupe_against=against)
         elif k == "whatsapp_ios":
             # ChatStorage.sqlite extracted from an iPhone backup
@@ -146,8 +151,14 @@ def main():
         else:
             print(f"unknown kind: {k}"); sys.exit(1)
 
+        if not a.allow_empty and res["added"] + res["skipped"] == 0:
+            raise ValueError("No records recognized; check export layout and identity, or use --allow-empty for an intentionally empty source")
     print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError, TypeError, sqlite3.Error, RuntimeError) as exc:
+        print(f"Ingest failed: {exc}", file=sys.stderr)
+        sys.exit(1)
