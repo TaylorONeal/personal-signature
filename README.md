@@ -116,6 +116,30 @@ Every item lands in exactly one **bucket**, and the bucket decides which goal it
 
 ---
 
+## Install the skills
+
+Paste this into Claude Code, ChatGPT, or whichever agent you use:
+
+```
+Install the skills from https://github.com/TaylorONeal/personal-signature
+```
+
+Or install them directly:
+
+```bash
+npx skills add TaylorONeal/personal-signature --list                             # see what is here first
+npx skills add TaylorONeal/personal-signature --global --yes                     # all five
+npx skills add TaylorONeal/personal-signature --skill corpus-ingest --global --yes   # just one
+```
+
+Needs Node 22.20 or later. The skills drive the pipeline; the engine underneath is Python with no pip dependencies, and the install below covers it. The repo is also a Claude plugin, so `.claude-plugin/plugin.json` installs the same five skills that way.
+
+The five, in pipeline order: [`corpus-acquire`](skills/corpus-acquire/SKILL.md), [`corpus-collect`](skills/corpus-collect/SKILL.md), [`corpus-ingest`](skills/corpus-ingest/SKILL.md), [`corpus-profile`](skills/corpus-profile/SKILL.md), [`corpus-analyze`](skills/corpus-analyze/SKILL.md).
+
+Nothing leaves your machine: the engine makes no network calls and the corpus stays local. Read [Privacy & safety](#privacy--safety) before a bulk run.
+
+---
+
 ## First run
 
 Use maintained Python 3.11+ with SQLite FTS5 and JSON support; no pip dependencies. No web server, account, or API key is needed for the engine. Agent skills require a separately configured agent.
