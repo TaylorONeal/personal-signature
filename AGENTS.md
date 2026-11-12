@@ -27,3 +27,7 @@ Guidance for AI agents (and humans) working on this repo. The "Lessons learned" 
 - Never document or automate anything that enters passwords/2FA — skills hand auth steps to the user. Hard rule.
 - `corpus.db` is git-ignored and local-only; profile/analysis outputs stay local and out of cross-session memory. Don't add examples that pipe corpus contents to external services.
 - Back-up-before-bulk-run and the shrink-guard are load-bearing safety copy — keep them in any rewrite of ingest docs.
+
+## Secrets
+
+Never write a secret into any file: code, config, docs, notes, prompts, submission notes, logs or commit messages. That covers API keys (RevenueCat and Stripe `sk_` keys included), Supabase service role keys and JWT secrets, access tokens (Codemagic, Vercel, GitHub, Expo), deploy keys, and the contents of `.p8` or `.pem` files. Write where the secret lives instead, for example "RevenueCat dashboard > API keys" or "Supabase secrets", and read it from an environment variable. The secret-scan check (`.github/workflows/secret-scan.yml`, rules in `.gitleaks.toml`) fails any pull request that adds one. If a real secret was ever committed, removing it is not enough: say so, so the key gets rotated.
